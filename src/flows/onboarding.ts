@@ -239,10 +239,6 @@ export async function askYear(
     const year = Number(text);
     const nowMs = await conversation.now();
     const currentYear = new Date(nowMs).getUTCFullYear();
-    if (year > currentYear - 18) {
-      await next.reply(t(locale, "onboardingTooYoung"));
-      await conversation.halt();
-    }
     if (year < currentYear - 120 || year > currentYear) {
       await next.reply(t(locale, "onboardingYearBad"));
       continue;

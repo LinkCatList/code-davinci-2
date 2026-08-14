@@ -112,6 +112,27 @@ export async function insertEventOnce(db: Db, userId: number, type: EventType): 
   await db.insert(events).values({ userId, type, createdAt: now() });
 }
 
+export async function deleteSnippet(
+  db: Db,
+  userId: number,
+  snippetId: number,
+): Promise<"ok" | "last" | "missing"> {
+  const all = await listSnippets(db, userId);
+  if (all.length <= 1) return "last";
+  const target = all.find((row) => row.id === snippetId);
+  if (!target) return "missing";
+  await db
+    .delete(snippets)
+    .where(and(eq(snippets.id, snippetId), eq(snippets.userId, userId)));
+  const remaining = await listSnippets(db, userId);
+  for (const [index, row] of remaining.entries()) {
+    if (row.position !== index) {
+      await db.update(snippets).set({ position: index }).where(eq(snippets.id, row.id));
+    }
+  }
+  return "ok";
+}
+
 export function isOnboarding(user: UserRecord): boolean {
   return user.state !== null;
 }

@@ -9,7 +9,6 @@ export const users = sqliteTable("users", {
   birthYear: integer("birth_year"),
   gender: integer("gender"),
   bio: text("bio"),
-  photoFileId: text("photo_file_id"),
   city: text("city"),
   lat: real("lat"),
   lng: real("lng"),

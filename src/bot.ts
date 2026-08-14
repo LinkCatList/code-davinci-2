@@ -14,11 +14,12 @@ import { d1SessionStorage } from "./db/session-storage";
 import type { Env } from "./env";
 import { renderOwnCard } from "./flows/card";
 import { onboarding, type OutsideContext } from "./flows/onboarding";
+import { editProfile, handleProfileCallback, handleProfileCommand } from "./flows/profile";
 import { t } from "./t";
 
 export type BotContext = OutsideContext;
 
-const STUB_COMMANDS = ["feed", "profile", "matches", "filters", "language", "delete"] as const;
+const STUB_COMMANDS = ["feed", "matches", "filters", "language", "delete"] as const;
 
 async function showOwnCard(ctx: BotContext): Promise<void> {
   if (!ctx.from) return;
@@ -77,6 +78,7 @@ export function createBot(
     }),
   );
   bot.use(createConversation(onboarding));
+  bot.use(createConversation(editProfile, "editProfile"));
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;
@@ -91,9 +93,15 @@ export function createBot(
     await ctx.conversation.enter("onboarding");
   });
 
+  bot.command("profile", handleProfileCommand);
+  bot.callbackQuery(/^pf:(name|year|gender|bio|loc|snippets)$/, handleProfileCallback);
+
   bot.command("cancel", async (ctx) => {
     if (ctx.conversation.active("onboarding") > 0) {
       await ctx.conversation.exit("onboarding");
+    }
+    if (ctx.conversation.active("editProfile") > 0) {
+      await ctx.conversation.exit("editProfile");
     }
     if (!ctx.from) return;
     const user = await getUser(ctx.db, ctx.from.id);
