@@ -59,4 +59,8 @@ export const en = {
   matchTitle: "It's a match.",
   matchPendingViewer: "It's a match. They need a Telegram @username before I can share the profile.",
   matchPendingOther: "You matched with someone. Set a @username in Telegram settings so they can reach you.",
+  likesButton: "Likes ({n})",
+  likesOpen: "See who liked you",
+  likesEmpty: "Nobody is waiting in likes.",
+  likesCardHint: "They liked you. Like back to match.",
 };

@@ -140,6 +140,28 @@ export async function insertSkip(db: Db, fromUser: number, toUser: number): Prom
   return true;
 }
 
+export async function listIncomingLikers(db: Db, userId: number): Promise<UserRecord[]> {
+  const incoming = await db
+    .select({ fromUser: likes.fromUser, createdAt: likes.createdAt })
+    .from(likes)
+    .where(eq(likes.toUser, userId))
+    .all();
+  const swiped = await listSwipedIds(db, userId);
+  incoming.sort((a, b) => b.createdAt - a.createdAt);
+  const result: UserRecord[] = [];
+  for (const row of incoming) {
+    if (swiped.has(row.fromUser)) continue;
+    const liker = await getUser(db, row.fromUser);
+    if (!liker || liker.isActive !== 1 || liker.state !== null || liker.isFake === 1) continue;
+    result.push(liker);
+  }
+  return result;
+}
+
+export async function countIncomingLikes(db: Db, userId: number): Promise<number> {
+  return (await listIncomingLikers(db, userId)).length;
+}
+
 export async function listSwipedIds(db: Db, fromUser: number): Promise<Set<number>> {
   const liked = await db
     .select({ toUser: likes.toUser })

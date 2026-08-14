@@ -13,9 +13,14 @@ import * as schema from "./db/schema";
 import { d1SessionStorage } from "./db/session-storage";
 import type { Env } from "./env";
 import { renderOwnCard } from "./flows/card";
-import { handleFeedCallback, handleFeedCommand } from "./flows/feed";
-import { flushPendingReveals } from "./flows/match";
 import { onboarding, type OutsideContext } from "./flows/onboarding";
+import {
+  handleFeedCallback,
+  handleFeedCommand,
+  handleLikesAction,
+  handleLikesOpen,
+} from "./flows/feed";
+import { flushPendingReveals } from "./flows/match";
 import { editProfile, handleProfileCallback, handleProfileCommand } from "./flows/profile";
 import { t } from "./t";
 
@@ -104,6 +109,8 @@ export function createBot(
   bot.callbackQuery(/^pf:(name|year|gender|bio|loc|snippets)$/, handleProfileCallback);
   bot.command("feed", handleFeedCommand);
   bot.callbackQuery(/^fd:(like|skip):\d+$/, handleFeedCallback);
+  bot.callbackQuery(/^lk:open$/, handleLikesOpen);
+  bot.callbackQuery(/^lk:(like|skip):\d+$/, handleLikesAction);
 
   bot.command("cancel", async (ctx) => {
     if (ctx.conversation.active("onboarding") > 0) {

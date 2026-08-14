@@ -1,4 +1,4 @@
-import { GrammyError, type Api, type Context } from "grammy";
+import { GrammyError, InlineKeyboard, type Api, type Context } from "grammy";
 import {
   type Db,
   type MatchRecord,
@@ -127,7 +127,9 @@ export async function processNewLike(
       if (!claimed) return;
       const locale = isLocale(claimed.locale) ? claimed.locale : "en";
       await safeSend(ctx.api, ctx.db, toUserId, () =>
-        ctx.api.sendMessage(toUserId, t(locale, "likeDigest", { n: claimed.n })),
+        ctx.api.sendMessage(toUserId, t(locale, "likeDigest", { n: claimed.n }), {
+          reply_markup: new InlineKeyboard().text(t(locale, "likesOpen"), "lk:open"),
+        }),
       );
     })(),
   );

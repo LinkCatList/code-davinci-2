@@ -1,5 +1,5 @@
 import { InlineKeyboard, type Context } from "grammy";
-import { deleteSnippet, getUser, isOnboarding, listSnippets } from "../db/queries";
+import { countIncomingLikes, deleteSnippet, getUser, isOnboarding, listSnippets } from "../db/queries";
 import { renderOwnCard } from "./card";
 import {
   askBio,
@@ -24,8 +24,10 @@ function isEditField(value: string): value is EditField {
   return (EDIT_FIELDS as readonly string[]).includes(value);
 }
 
-function editKeyboard(locale: Locale): InlineKeyboard {
+function editKeyboard(locale: Locale, likesCount: number): InlineKeyboard {
   return new InlineKeyboard()
+    .text(t(locale, "likesButton", { n: likesCount }), "lk:open")
+    .row()
     .text(t(locale, "editName"), "pf:name")
     .text(t(locale, "editYear"), "pf:year")
     .row()
@@ -42,6 +44,7 @@ export async function replyProfile(ctx: OutsideContext): Promise<void> {
   const user = await getUser(ctx.db, ctx.from.id);
   if (!user || user.name === null || user.birthYear === null) return;
   const snippets = await listSnippets(ctx.db, user.id);
+  const likesCount = await countIncomingLikes(ctx.db, user.id);
   await ctx.reply(
     renderOwnCard({
       name: user.name,
@@ -53,7 +56,7 @@ export async function replyProfile(ctx: OutsideContext): Promise<void> {
       includeAllSnippets: true,
       footer: t(ctx.locale, "profileEditHint"),
     }),
-    { parse_mode: "HTML", reply_markup: editKeyboard(ctx.locale) },
+    { parse_mode: "HTML", reply_markup: editKeyboard(ctx.locale, likesCount) },
   );
 }
 
@@ -68,7 +71,8 @@ async function replyProfileFromConversation(
     const user = await getUser(outer.db, outer.from.id);
     if (!user || user.name === null || user.birthYear === null) return null;
     const snippets = await listSnippets(outer.db, user.id);
-    return { user, snippets };
+    const likesCount = await countIncomingLikes(outer.db, user.id);
+    return { user, snippets, likesCount };
   });
   if (!data) return;
   await ctx.reply(
@@ -82,7 +86,7 @@ async function replyProfileFromConversation(
       includeAllSnippets: true,
       footer: t(locale, "profileEditHint"),
     }),
-    { parse_mode: "HTML", reply_markup: editKeyboard(locale) },
+    { parse_mode: "HTML", reply_markup: editKeyboard(locale, data.likesCount) },
   );
 }
 

@@ -61,4 +61,8 @@ export const ru: { [K in keyof typeof en]: string } = {
   matchTitle: "Мэтч.",
   matchPendingViewer: "Мэтч. У них нет @username — пока не могу отдать профиль.",
   matchPendingOther: "У тебя мэтч. Поставь @username в настройках Telegram, чтобы с тобой могли связаться.",
+  likesButton: "Лайки ({n})",
+  likesOpen: "Кто лайкнул",
+  likesEmpty: "Пока никто не ждёт в лайках.",
+  likesCardHint: "Этот человек лайкнул тебя. Лайк в ответ — мэтч.",
 };
