@@ -166,6 +166,9 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
     ["❤️", "like"],
     ["👎", "skip"],
     ["💤", "sleep"],
+    ["1 ❤️", "like"],
+    ["2 👎", "skip"],
+    ["3 💤", "sleep"],
   ]);
 }
 
