@@ -55,4 +55,7 @@ export const ru: { [K in keyof typeof en]: string } = {
   nothingToCancel: "Отменять нечего.",
   finishOnboardingFirst: "Сначала закончи профиль или /cancel.",
   comingSoon: "Ещё не сделано.",
+  feedLike: "👍 Лайк",
+  feedSkip: "👎 Скип",
+  feedEmpty: "Пока никого нет. Загляни позже.",
 };

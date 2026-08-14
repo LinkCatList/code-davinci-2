@@ -53,4 +53,7 @@ export const en = {
   nothingToCancel: "Nothing to cancel.",
   finishOnboardingFirst: "Finish your profile first, or /cancel.",
   comingSoon: "Not built yet.",
+  feedLike: "👍 Like",
+  feedSkip: "👎 Skip",
+  feedEmpty: "No more people right now. Check later.",
 };

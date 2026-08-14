@@ -1,3 +1,4 @@
+import { formatDistanceKm } from "../geo";
 import { snippetFenceId } from "../snippet-languages";
 
 export function escapeHtml(value: string): string {
@@ -21,6 +22,7 @@ export function renderOwnCard(input: {
   city: string | null;
   snippets: CardSnippet[];
   nowMs: number;
+  distanceKm?: number | null;
   includeAllSnippets?: boolean;
   header?: string;
   footer?: string;
@@ -38,7 +40,8 @@ export function renderOwnCard(input: {
   }
   lines.push(`<b>${escapeHtml(input.name)}</b>, ${age}`);
   if (langs) lines.push(escapeHtml(langs));
-  if (input.city) lines.push(escapeHtml(input.city));
+  if (input.distanceKm != null) lines.push(escapeHtml(formatDistanceKm(input.distanceKm)));
+  else if (input.city) lines.push(escapeHtml(input.city));
   if (input.bio) lines.push(escapeHtml(input.bio));
   if (input.footer) lines.push("", input.footer);
 

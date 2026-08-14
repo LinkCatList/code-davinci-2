@@ -1,0 +1,118 @@
+import { InlineKeyboard, type Context } from "grammy";
+import {
+  type Db,
+  getUser,
+  insertEvent,
+  insertLike,
+  insertSkip,
+  isOnboarding,
+  listFeedCandidates,
+  listSnippets,
+  pickCandidate,
+  type UserRecord,
+} from "../db/queries";
+import { renderOwnCard } from "./card";
+import { t, type Locale } from "../t";
+
+type FeedContext = Context & {
+  db: Db;
+  locale: Locale;
+  executionCtx: ExecutionContext;
+};
+
+export type FeedCard = {
+  html: string;
+  candidateId: number;
+};
+
+export function likeSkipKeyboard(locale: Locale, candidateId: number): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t(locale, "feedLike"), `fd:like:${candidateId}`)
+    .text(t(locale, "feedSkip"), `fd:skip:${candidateId}`);
+}
+
+export async function loadNextFeedCard(
+  db: Db,
+  viewer: UserRecord,
+  nowMs: number,
+): Promise<FeedCard | null> {
+  let candidates = await listFeedCandidates(db, viewer);
+  while (candidates.length > 0) {
+    const picked = pickCandidate(viewer, candidates);
+    if (!picked) return null;
+    const snippets = await listSnippets(db, picked.user.id);
+    if (picked.user.name !== null && picked.user.birthYear !== null && snippets.length > 0) {
+      return {
+        candidateId: picked.user.id,
+        html: renderOwnCard({
+          name: picked.user.name,
+          birthYear: picked.user.birthYear,
+          bio: picked.user.bio,
+          city: picked.user.city,
+          snippets,
+          nowMs,
+          distanceKm: picked.distanceKm,
+        }),
+      };
+    }
+    candidates = candidates.filter((row) => row.id !== picked.user.id);
+  }
+  return null;
+}
+
+export async function replyNextFeedCard(ctx: FeedContext): Promise<void> {
+  if (!ctx.from) return;
+  const viewer = await getUser(ctx.db, ctx.from.id);
+  if (!viewer || isOnboarding(viewer)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  const card = await loadNextFeedCard(ctx.db, viewer, Date.now());
+  if (!card) {
+    await ctx.reply(t(ctx.locale, "feedEmpty"));
+    return;
+  }
+  await ctx.reply(card.html, {
+    parse_mode: "HTML",
+    reply_markup: likeSkipKeyboard(ctx.locale, card.candidateId),
+  });
+}
+
+export async function handleFeedCommand(ctx: FeedContext): Promise<void> {
+  await replyNextFeedCard(ctx);
+}
+
+export async function handleFeedCallback(ctx: FeedContext): Promise<void> {
+  const data = ctx.callbackQuery?.data ?? "";
+  const match = /^fd:(like|skip):(\d+)$/.exec(data);
+  if (!match) return;
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.answerCallbackQuery();
+    } catch {
+      // already answered
+    }
+  }
+  if (!ctx.from) return;
+  const viewer = await getUser(ctx.db, ctx.from.id);
+  if (!viewer || isOnboarding(viewer)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+
+  const action = match[1];
+  const toUser = Number(match[2]);
+  if (!Number.isFinite(toUser) || toUser === viewer.id) {
+    await replyNextFeedCard(ctx);
+    return;
+  }
+
+  const inserted =
+    action === "like"
+      ? await insertLike(ctx.db, viewer.id, toUser)
+      : await insertSkip(ctx.db, viewer.id, toUser);
+  if (inserted) {
+    await insertEvent(ctx.db, viewer.id, action === "like" ? "like" : "skip");
+  }
+  await replyNextFeedCard(ctx);
+}

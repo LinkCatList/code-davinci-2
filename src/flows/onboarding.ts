@@ -15,6 +15,7 @@ import {
   type UserRecord,
 } from "../db/queries";
 import { renderOwnCard } from "./card";
+import { likeSkipKeyboard, loadNextFeedCard } from "./feed";
 import { isSnippetLanguage, SNIPPET_LANGUAGES } from "../snippet-languages";
 import { t, type Locale } from "../t";
 
@@ -580,24 +581,21 @@ export async function onboarding(conversation: OnboardingConversation, ctx: Cont
     if (!username) {
       await ctx.reply(t(locale, "onboardingUsernameWarn"));
     }
-    user = (await loadUser(conversation)) ?? user;
-    const readySnippets = await loadSnippets(conversation);
     const nowMs = await conversation.now();
-    if (user.name !== null && user.birthYear !== null) {
-      await ctx.reply(
-        renderOwnCard({
-          name: user.name,
-          birthYear: user.birthYear,
-          bio: user.bio,
-          city: user.city,
-          snippets: readySnippets,
-          nowMs,
-          includeAllSnippets: true,
-          footer: t(locale, "profileReady"),
-        }),
-        { parse_mode: "HTML" },
-      );
+    const feed = await conversation.external(async (outer) => {
+      if (!outer.from) return null;
+      const viewer = await getUser(outer.db, outer.from.id);
+      if (!viewer) return null;
+      return loadNextFeedCard(outer.db, viewer, nowMs);
+    });
+    if (!feed) {
+      await ctx.reply(t(locale, "feedEmpty"));
+      return;
     }
+    await ctx.reply(feed.html, {
+      parse_mode: "HTML",
+      reply_markup: likeSkipKeyboard(locale, feed.candidateId),
+    });
     return;
   }
 }

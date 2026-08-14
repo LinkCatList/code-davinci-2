@@ -13,13 +13,14 @@ import * as schema from "./db/schema";
 import { d1SessionStorage } from "./db/session-storage";
 import type { Env } from "./env";
 import { renderOwnCard } from "./flows/card";
+import { handleFeedCallback, handleFeedCommand } from "./flows/feed";
 import { onboarding, type OutsideContext } from "./flows/onboarding";
 import { editProfile, handleProfileCallback, handleProfileCommand } from "./flows/profile";
 import { t } from "./t";
 
 export type BotContext = OutsideContext;
 
-const STUB_COMMANDS = ["feed", "matches", "filters", "language", "delete"] as const;
+const STUB_COMMANDS = ["matches", "filters", "language", "delete"] as const;
 
 async function showOwnCard(ctx: BotContext): Promise<void> {
   if (!ctx.from) return;
@@ -95,6 +96,8 @@ export function createBot(
 
   bot.command("profile", handleProfileCommand);
   bot.callbackQuery(/^pf:(name|year|gender|bio|loc|snippets)$/, handleProfileCallback);
+  bot.command("feed", handleFeedCommand);
+  bot.callbackQuery(/^fd:(like|skip):\d+$/, handleFeedCallback);
 
   bot.command("cancel", async (ctx) => {
     if (ctx.conversation.active("onboarding") > 0) {

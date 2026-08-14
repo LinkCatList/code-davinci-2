@@ -1,15 +1,16 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { distanceBetween } from "../geo";
 import { now } from "../now";
 import { localeFromTelegram, type Locale } from "../t";
 import * as schema from "./schema";
-import { events, snippets, users } from "./schema";
+import { events, likes, skips, snippets, users } from "./schema";
 
 export type Db = DrizzleD1Database<typeof schema>;
 
 export type UserRecord = typeof users.$inferSelect;
 export type SnippetRecord = typeof snippets.$inferSelect;
-export type EventType = "onboarding_start" | "profile_complete";
+export type EventType = "onboarding_start" | "profile_complete" | "like" | "skip";
 
 export async function upsertUser(
   db: Db,
@@ -110,6 +111,94 @@ export async function hasEvent(db: Db, userId: number, type: EventType): Promise
 export async function insertEventOnce(db: Db, userId: number, type: EventType): Promise<void> {
   if (await hasEvent(db, userId, type)) return;
   await db.insert(events).values({ userId, type, createdAt: now() });
+}
+
+export async function insertEvent(db: Db, userId: number, type: EventType): Promise<void> {
+  await db.insert(events).values({ userId, type, createdAt: now() });
+}
+
+export async function insertLike(db: Db, fromUser: number, toUser: number): Promise<boolean> {
+  const existing = await db
+    .select({ id: likes.id })
+    .from(likes)
+    .where(and(eq(likes.fromUser, fromUser), eq(likes.toUser, toUser)))
+    .get();
+  if (existing) return false;
+  await db.insert(likes).values({ fromUser, toUser, createdAt: now() });
+  return true;
+}
+
+export async function insertSkip(db: Db, fromUser: number, toUser: number): Promise<boolean> {
+  const existing = await db
+    .select({ id: skips.id })
+    .from(skips)
+    .where(and(eq(skips.fromUser, fromUser), eq(skips.toUser, toUser)))
+    .get();
+  if (existing) return false;
+  await db.insert(skips).values({ fromUser, toUser, createdAt: now() });
+  return true;
+}
+
+export async function listSwipedIds(db: Db, fromUser: number): Promise<Set<number>> {
+  const liked = await db
+    .select({ toUser: likes.toUser })
+    .from(likes)
+    .where(eq(likes.fromUser, fromUser))
+    .all();
+  const skipped = await db
+    .select({ toUser: skips.toUser })
+    .from(skips)
+    .where(eq(skips.fromUser, fromUser))
+    .all();
+  return new Set([...liked.map((row) => row.toUser), ...skipped.map((row) => row.toUser)]);
+}
+
+export function pickCandidate(
+  viewer: UserRecord,
+  candidates: UserRecord[],
+): { user: UserRecord; distanceKm: number | null } | null {
+  const viewerHasCoords = viewer.lat != null && viewer.lng != null;
+  const maxDist = viewer.maxDistKm;
+  const ranked: { user: UserRecord; distanceKm: number | null }[] = [];
+
+  for (const candidate of candidates) {
+    const distanceKm = distanceBetween(viewer, candidate);
+    if (viewerHasCoords && maxDist != null && (distanceKm == null || distanceKm > maxDist)) {
+      continue;
+    }
+    ranked.push({ user: candidate, distanceKm });
+  }
+
+  ranked.sort((a, b) => {
+    if (a.user.isFake !== b.user.isFake) return a.user.isFake - b.user.isFake;
+    if (a.distanceKm != null && b.distanceKm != null) return a.distanceKm - b.distanceKm;
+    if (a.distanceKm != null) return -1;
+    if (b.distanceKm != null) return 1;
+    return b.user.lastActiveAt - a.user.lastActiveAt;
+  });
+
+  return ranked[0] ?? null;
+}
+
+export async function listFeedCandidates(db: Db, viewer: UserRecord): Promise<UserRecord[]> {
+  const swiped = await listSwipedIds(db, viewer.id);
+  const rows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.isActive, 1), isNull(users.state)))
+    .all();
+
+  const open = rows.filter((row) => row.id !== viewer.id && !swiped.has(row.id));
+  if (viewer.langFilter == null) return open;
+
+  const withLang: UserRecord[] = [];
+  for (const row of open) {
+    const candidateSnippets = await listSnippets(db, row.id);
+    if (candidateSnippets.some((snippet) => snippet.language === viewer.langFilter)) {
+      withLang.push(row);
+    }
+  }
+  return withLang;
 }
 
 export async function deleteSnippet(
