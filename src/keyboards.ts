@@ -50,11 +50,8 @@ export function homeKeyboard(locale: Locale): Keyboard {
   return persist(
     new Keyboard()
       .text(t(locale, "menuBrowse"))
-      .row()
       .text(t(locale, "menuProfile"))
-      .row()
       .text(t(locale, "menuLikes"))
-      .row()
       .text(t(locale, "menuMatches")),
   );
 }
