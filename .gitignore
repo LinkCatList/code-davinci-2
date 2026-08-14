@@ -1,6 +1,5 @@
 node_modules
 .dev.vars
 .wrangler
-.temp
 dist
 *.sql.bak
