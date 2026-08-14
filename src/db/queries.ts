@@ -1,16 +1,21 @@
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { now } from "../now";
 import { localeFromTelegram, type Locale } from "../t";
 import * as schema from "./schema";
-import { users } from "./schema";
+import { events, snippets, users } from "./schema";
 
 export type Db = DrizzleD1Database<typeof schema>;
+
+export type UserRecord = typeof users.$inferSelect;
+export type SnippetRecord = typeof snippets.$inferSelect;
+export type EventType = "onboarding_start" | "profile_complete";
 
 export async function upsertUser(
   db: Db,
   from: { id: number; username?: string; language_code?: string },
 ): Promise<{ locale: Locale }> {
-  const ts = Math.floor(Date.now() / 1000);
+  const ts = now();
   const locale = localeFromTelegram(from.language_code);
   const existing = await db
     .select({ locale: users.locale })
@@ -40,4 +45,86 @@ export async function upsertUser(
     createdAt: ts,
   });
   return { locale };
+}
+
+export async function getUser(db: Db, id: number): Promise<UserRecord | null> {
+  const row = await db.select().from(users).where(eq(users.id, id)).get();
+  return row ?? null;
+}
+
+export async function patchUser(
+  db: Db,
+  id: number,
+  patch: Partial<typeof users.$inferInsert>,
+): Promise<void> {
+  await db.update(users).set(patch).where(eq(users.id, id));
+}
+
+export async function listSnippets(db: Db, userId: number): Promise<SnippetRecord[]> {
+  return db
+    .select()
+    .from(snippets)
+    .where(eq(snippets.userId, userId))
+    .orderBy(asc(snippets.position))
+    .all();
+}
+
+export async function insertSnippet(
+  db: Db,
+  values: { userId: number; language: string; content: string; position: number },
+): Promise<void> {
+  await db.insert(snippets).values(values);
+}
+
+export async function clearOnboardingFields(db: Db, userId: number): Promise<void> {
+  await db
+    .update(users)
+    .set({
+      name: null,
+      birthYear: null,
+      gender: null,
+      bio: null,
+      city: null,
+      lat: null,
+      lng: null,
+      state: "onboarding:name",
+    })
+    .where(eq(users.id, userId));
+  await db.delete(snippets).where(eq(snippets.userId, userId));
+}
+
+export async function completeProfile(db: Db, userId: number): Promise<void> {
+  await db.update(users).set({ state: null }).where(eq(users.id, userId));
+  await insertEventOnce(db, userId, "profile_complete");
+}
+
+export async function hasEvent(db: Db, userId: number, type: EventType): Promise<boolean> {
+  const row = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(and(eq(events.userId, userId), eq(events.type, type)))
+    .get();
+  return row !== undefined;
+}
+
+export async function insertEventOnce(db: Db, userId: number, type: EventType): Promise<void> {
+  if (await hasEvent(db, userId, type)) return;
+  await db.insert(events).values({ userId, type, createdAt: now() });
+}
+
+export function isOnboarding(user: UserRecord): boolean {
+  return user.state !== null;
+}
+
+export function isProfileComplete(
+  user: UserRecord,
+  snippetCount: number,
+): boolean {
+  return (
+    user.state === null &&
+    user.name !== null &&
+    user.birthYear !== null &&
+    user.gender !== null &&
+    snippetCount > 0
+  );
 }

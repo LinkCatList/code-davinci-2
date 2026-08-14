@@ -1,0 +1,607 @@
+import {
+  type Conversation,
+  type ConversationFlavor,
+} from "@grammyjs/conversations";
+import { InlineKeyboard, type Context } from "grammy";
+import {
+  clearOnboardingFields,
+  completeProfile,
+  getUser,
+  insertEventOnce,
+  insertSnippet,
+  listSnippets,
+  patchUser,
+  type SnippetRecord,
+  type UserRecord,
+} from "../db/queries";
+import { renderOwnCard } from "./card";
+import { isSnippetLanguage, SNIPPET_LANGUAGES } from "../snippet-languages";
+import { t, type Locale } from "../t";
+
+export type OutsideContext = ConversationFlavor<
+  Context & {
+    db: import("../db/queries").Db;
+    executionCtx: ExecutionContext;
+    locale: Locale;
+  }
+>;
+
+export type BotConversation = Conversation<OutsideContext, Context>;
+type OnboardingConversation = BotConversation;
+
+const STEPS = [
+  "onboarding:lang",
+  "onboarding:name",
+  "onboarding:year",
+  "onboarding:gender",
+  "onboarding:bio",
+  "onboarding:location",
+  "onboarding:snippets",
+  "onboarding:preview",
+] as const;
+
+type OnboardingStep = (typeof STEPS)[number];
+
+function normalizeStep(state: string | null): OnboardingStep {
+  if (state === "onboarding" || state === null) return "onboarding:lang";
+  if (state === "onboarding:photo") return "onboarding:snippets";
+  if ((STEPS as readonly string[]).includes(state)) return state as OnboardingStep;
+  return "onboarding:lang";
+}
+
+function commandName(ctx: Context): string | undefined {
+  const raw = ctx.message?.text;
+  if (!raw?.startsWith("/")) return undefined;
+  const name = raw.slice(1).split(/[\s@]/)[0];
+  return name?.toLowerCase() || undefined;
+}
+
+async function dropMarkup(ctx: Context): Promise<void> {
+  try {
+    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+  } catch {
+    // message may be gone or have no markup
+  }
+}
+
+async function ackCallback(ctx: Context): Promise<void> {
+  if (!ctx.callbackQuery) return;
+  try {
+    await ctx.answerCallbackQuery();
+  } catch {
+    // already answered or expired
+  }
+}
+
+async function handleMeta(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  reprompt: () => Promise<unknown>,
+  cancelText: string,
+): Promise<boolean> {
+  const cmd = commandName(ctx);
+  if (cmd === "start") {
+    await reprompt();
+    return true;
+  }
+  if (cmd === "cancel") {
+    await ctx.reply(cancelText);
+    await conversation.halt();
+  }
+  if (cmd) {
+    await conversation.halt({ next: true });
+  }
+  return false;
+}
+
+export async function waitUpdate(
+  conversation: OnboardingConversation,
+  send: (ctx: Context) => Promise<unknown>,
+  cancelText: string,
+): Promise<Context> {
+  for (;;) {
+    const next = await conversation.wait();
+    await ackCallback(next);
+    if (await handleMeta(conversation, next, () => send(next), cancelText)) continue;
+    return next;
+  }
+}
+
+export async function loadUser(conversation: OnboardingConversation): Promise<UserRecord | null> {
+  return conversation.external(async (outer) => {
+    if (!outer.from) return null;
+    return getUser(outer.db, outer.from.id);
+  });
+}
+
+export async function loadSnippets(conversation: OnboardingConversation): Promise<SnippetRecord[]> {
+  return conversation.external(async (outer) => {
+    if (!outer.from) return [];
+    return listSnippets(outer.db, outer.from.id);
+  });
+}
+
+async function saveUser(
+  conversation: OnboardingConversation,
+  patch: Parameters<typeof patchUser>[2],
+): Promise<void> {
+  await conversation.external(async (outer) => {
+    if (!outer.from) return;
+    await patchUser(outer.db, outer.from.id, patch);
+  });
+}
+
+async function setStep(conversation: OnboardingConversation, state: OnboardingStep): Promise<void> {
+  await saveUser(conversation, { state });
+}
+
+function localeOf(user: UserRecord): Locale {
+  return user.locale === "ru" ? "ru" : "en";
+}
+
+function langKeyboard(locale: Locale): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  keyboard.text(locale === "ru" ? "🇷🇺 RU ✓" : "🇷🇺 RU", "ob:lang:ru");
+  keyboard.text(locale === "en" ? "🇬🇧 EN ✓" : "🇬🇧 EN", "ob:lang:en");
+  return keyboard;
+}
+
+function genderKeyboard(locale: Locale): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t(locale, "onboardingGenderMale"), "ob:gender:0")
+    .text(t(locale, "onboardingGenderFemale"), "ob:gender:1");
+}
+
+function skipKeyboard(locale: Locale, data: string): InlineKeyboard {
+  return new InlineKeyboard().text(t(locale, "onboardingSkip"), data);
+}
+
+function snippetLangKeyboard(): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  SNIPPET_LANGUAGES.forEach((language, index) => {
+    keyboard.text(language, `ob:slang:${language}`);
+    if ((index + 1) % 3 === 0) keyboard.row();
+  });
+  return keyboard;
+}
+
+function snippetMoreKeyboard(locale: Locale): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t(locale, "onboardingSnippetAdd"), "ob:snip:more")
+    .text(t(locale, "onboardingSnippetDone"), "ob:snip:done");
+}
+
+function previewKeyboard(locale: Locale): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t(locale, "onboardingConfirm"), "ob:preview:ok")
+    .text(t(locale, "onboardingStartOver"), "ob:preview:reset");
+}
+
+async function askLanguage(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+): Promise<Locale> {
+  const send = async (target: Context) => {
+    await target.reply(t(locale, "startWelcome"));
+    await target.reply(t(locale, "onboardingLang"), { reply_markup: langKeyboard(locale) });
+  };
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, t(locale, "onboardingCancelled"));
+    const data = next.callbackQuery?.data;
+    if (data === "ob:lang:ru" || data === "ob:lang:en") {
+      const picked: Locale = data.endsWith("ru") ? "ru" : "en";
+      await dropMarkup(next);
+      await saveUser(conversation, { locale: picked });
+      return picked;
+    }
+    await next.reply(t(locale, "onboardingLang"), { reply_markup: langKeyboard(locale) });
+  }
+}
+
+export async function askName(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<void> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) => target.reply(t(locale, "onboardingName"));
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    const text = next.message?.text?.trim();
+    if (text && text.length >= 1 && text.length <= 50) {
+      await saveUser(conversation, { name: text });
+      return;
+    }
+    await next.reply(t(locale, "onboardingNameBad"));
+  }
+}
+
+export async function askYear(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<void> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) => target.reply(t(locale, "onboardingYear"));
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    const text = next.message?.text?.trim();
+    if (!text || !/^\d{4}$/.test(text)) {
+      await next.reply(t(locale, "onboardingYearBad"));
+      continue;
+    }
+    const year = Number(text);
+    const nowMs = await conversation.now();
+    const currentYear = new Date(nowMs).getUTCFullYear();
+    if (year > currentYear - 18) {
+      await next.reply(t(locale, "onboardingTooYoung"));
+      await conversation.halt();
+    }
+    if (year < currentYear - 120 || year > currentYear) {
+      await next.reply(t(locale, "onboardingYearBad"));
+      continue;
+    }
+    await saveUser(conversation, { birthYear: year });
+    return;
+  }
+}
+
+export async function askGender(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<void> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingGender"), { reply_markup: genderKeyboard(locale) });
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    const data = next.callbackQuery?.data;
+    if (data === "ob:gender:0" || data === "ob:gender:1") {
+      await dropMarkup(next);
+      await saveUser(conversation, { gender: data.endsWith("1") ? 1 : 0 });
+      return;
+    }
+    await next.reply(t(locale, "onboardingGenderBad"), { reply_markup: genderKeyboard(locale) });
+  }
+}
+
+export async function askBio(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<void> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingBio"), { reply_markup: skipKeyboard(locale, "ob:skip:bio") });
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    if (next.callbackQuery?.data === "ob:skip:bio") {
+      await dropMarkup(next);
+      await saveUser(conversation, { bio: null });
+      return;
+    }
+    const text = next.message?.text;
+    if (text !== undefined) {
+      const trimmed = text.trim();
+      if (trimmed.length === 0) {
+        await saveUser(conversation, { bio: null });
+        return;
+      }
+      if (trimmed.length > 300) {
+        await next.reply(t(locale, "onboardingBioBad"), {
+          reply_markup: skipKeyboard(locale, "ob:skip:bio"),
+        });
+        continue;
+      }
+      await saveUser(conversation, { bio: trimmed });
+      return;
+    }
+    await next.reply(t(locale, "onboardingBioBad"), {
+      reply_markup: skipKeyboard(locale, "ob:skip:bio"),
+    });
+  }
+}
+
+export async function askLocation(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<void> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingLocation"), {
+      reply_markup: skipKeyboard(locale, "ob:skip:loc"),
+    });
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    if (next.callbackQuery?.data === "ob:skip:loc") {
+      await dropMarkup(next);
+      await saveUser(conversation, { city: null, lat: null, lng: null });
+      return;
+    }
+    const location = next.message?.location;
+    if (location) {
+      await saveUser(conversation, {
+        city: null,
+        lat: location.latitude,
+        lng: location.longitude,
+      });
+      return;
+    }
+    const text = next.message?.text?.trim();
+    if (text) {
+      await saveUser(conversation, { city: text, lat: null, lng: null });
+      return;
+    }
+    await next.reply(t(locale, "onboardingLocationBad"), {
+      reply_markup: skipKeyboard(locale, "ob:skip:loc"),
+    });
+  }
+}
+
+export async function askSnippetText(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<string> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) => target.reply(t(locale, "onboardingSnippet"));
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    if (next.message?.photo) {
+      await next.reply(t(locale, "onboardingSnippetBad"));
+      continue;
+    }
+    const text = next.message?.text;
+    if (text !== undefined) {
+      if (text.length >= 1 && text.length <= 1500) {
+        return text;
+      }
+    }
+    await next.reply(t(locale, "onboardingSnippetBad"));
+  }
+}
+
+export async function askSnippetLanguage(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  cancelText?: string,
+): Promise<string> {
+  const stop = cancelText ?? t(locale, "onboardingCancelled");
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingSnippetLang"), { reply_markup: snippetLangKeyboard() });
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, stop);
+    const data = next.callbackQuery?.data;
+    if (data?.startsWith("ob:slang:")) {
+      const language = data.slice("ob:slang:".length);
+      if (isSnippetLanguage(language)) {
+        await dropMarkup(next);
+        return language;
+      }
+    }
+    await next.reply(t(locale, "onboardingSnippetLangBad"), {
+      reply_markup: snippetLangKeyboard(),
+    });
+  }
+}
+
+export async function saveSnippet(
+  conversation: OnboardingConversation,
+  content: string,
+  language: string,
+  position: number,
+): Promise<void> {
+  await conversation.external(async (outer) => {
+    if (!outer.from) return;
+    await insertSnippet(outer.db, {
+      userId: outer.from.id,
+      language,
+      content,
+      position,
+    });
+  });
+}
+
+async function askMoreSnippets(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  startCount: number,
+): Promise<void> {
+  let count = startCount;
+  while (count < 3) {
+    const send = (target: Context) =>
+      target.reply(t(locale, "onboardingSnippetMore"), {
+        reply_markup: snippetMoreKeyboard(locale),
+      });
+    await send(ctx);
+    let add = false;
+    for (;;) {
+      const next = await waitUpdate(conversation, send, t(locale, "onboardingCancelled"));
+      const data = next.callbackQuery?.data;
+      if (data === "ob:snip:done") {
+        await dropMarkup(next);
+        return;
+      }
+      if (data === "ob:snip:more") {
+        await dropMarkup(next);
+        add = true;
+        ctx = next;
+        break;
+      }
+      await next.reply(t(locale, "onboardingSnippetMore"), {
+        reply_markup: snippetMoreKeyboard(locale),
+      });
+    }
+    if (!add) return;
+    const content = await askSnippetText(conversation, ctx, locale);
+    const language = await askSnippetLanguage(conversation, ctx, locale);
+    await saveSnippet(conversation, content, language, count);
+    count += 1;
+  }
+}
+
+async function askPreview(
+  conversation: OnboardingConversation,
+  ctx: Context,
+  locale: Locale,
+  user: UserRecord,
+  snippets: SnippetRecord[],
+): Promise<"ok" | "reset"> {
+  const nowMs = await conversation.now();
+  const card = renderOwnCard({
+    name: user.name ?? "",
+    birthYear: user.birthYear ?? 0,
+    bio: user.bio,
+    city: user.city,
+    snippets,
+    nowMs,
+    includeAllSnippets: true,
+    footer: t(locale, "onboardingPreview"),
+  });
+  const send = async (target: Context) => {
+    await target.reply(card, { parse_mode: "HTML", reply_markup: previewKeyboard(locale) });
+  };
+  await send(ctx);
+  for (;;) {
+    const next = await waitUpdate(conversation, send, t(locale, "onboardingCancelled"));
+    const data = next.callbackQuery?.data;
+    if (data === "ob:preview:ok" || data === "ob:preview:reset") {
+      await dropMarkup(next);
+      return data.endsWith("ok") ? "ok" : "reset";
+    }
+    await next.reply(t(locale, "onboardingPreviewBad"), { reply_markup: previewKeyboard(locale) });
+  }
+}
+
+export async function onboarding(conversation: OnboardingConversation, ctx: Context) {
+  await conversation.external(async (outer) => {
+    if (!outer.from) return;
+    await insertEventOnce(outer.db, outer.from.id, "onboarding_start");
+  });
+
+  for (;;) {
+    let user = await loadUser(conversation);
+    if (!user) {
+      await ctx.reply(t("en", "onboardingMissingUser"));
+      return;
+    }
+    let locale = localeOf(user);
+    let step = normalizeStep(user.state);
+
+    if (step === "onboarding:lang") {
+      locale = await askLanguage(conversation, ctx, locale);
+      await setStep(conversation, "onboarding:name");
+      step = "onboarding:name";
+      user = (await loadUser(conversation)) ?? user;
+    }
+
+    if (step === "onboarding:name") {
+      if (!user.name) await askName(conversation, ctx, locale);
+      await setStep(conversation, "onboarding:year");
+      step = "onboarding:year";
+      user = (await loadUser(conversation)) ?? user;
+    }
+
+    if (step === "onboarding:year") {
+      if (user.birthYear == null) await askYear(conversation, ctx, locale);
+      await setStep(conversation, "onboarding:gender");
+      step = "onboarding:gender";
+      user = (await loadUser(conversation)) ?? user;
+    }
+
+    if (step === "onboarding:gender") {
+      if (user.gender == null) await askGender(conversation, ctx, locale);
+      await setStep(conversation, "onboarding:bio");
+      step = "onboarding:bio";
+      user = (await loadUser(conversation)) ?? user;
+    }
+
+    if (step === "onboarding:bio") {
+      await askBio(conversation, ctx, locale);
+      await setStep(conversation, "onboarding:location");
+      step = "onboarding:location";
+      user = (await loadUser(conversation)) ?? user;
+    }
+
+    if (step === "onboarding:location") {
+      await askLocation(conversation, ctx, locale);
+      await setStep(conversation, "onboarding:snippets");
+      step = "onboarding:snippets";
+      user = (await loadUser(conversation)) ?? user;
+    }
+
+    if (step === "onboarding:snippets") {
+      let snippets = await loadSnippets(conversation);
+      if (snippets.length === 0) {
+        const content = await askSnippetText(conversation, ctx, locale);
+        const language = await askSnippetLanguage(conversation, ctx, locale);
+        await saveSnippet(conversation, content, language, 0);
+        snippets = await loadSnippets(conversation);
+      }
+      if (snippets.length < 3) {
+        await askMoreSnippets(conversation, ctx, locale, snippets.length);
+      }
+      await setStep(conversation, "onboarding:preview");
+      step = "onboarding:preview";
+    }
+
+    user = (await loadUser(conversation)) ?? user;
+    const snippets = await loadSnippets(conversation);
+    const decision = await askPreview(conversation, ctx, locale, user, snippets);
+    if (decision === "reset") {
+      await conversation.external(async (outer) => {
+        if (!outer.from) return;
+        await clearOnboardingFields(outer.db, outer.from.id);
+      });
+      continue;
+    }
+
+    await conversation.external(async (outer) => {
+      if (!outer.from) return;
+      await completeProfile(outer.db, outer.from.id);
+    });
+
+    const username = await conversation.external((outer) => outer.from?.username ?? null);
+    if (!username) {
+      await ctx.reply(t(locale, "onboardingUsernameWarn"));
+    }
+    user = (await loadUser(conversation)) ?? user;
+    const readySnippets = await loadSnippets(conversation);
+    const nowMs = await conversation.now();
+    if (user.name !== null && user.birthYear !== null) {
+      await ctx.reply(
+        renderOwnCard({
+          name: user.name,
+          birthYear: user.birthYear,
+          bio: user.bio,
+          city: user.city,
+          snippets: readySnippets,
+          nowMs,
+          includeAllSnippets: true,
+          footer: t(locale, "profileReady"),
+        }),
+        { parse_mode: "HTML" },
+      );
+    }
+    return;
+  }
+}

@@ -7,5 +7,5 @@ compatibility_date = "2026-08-14"
 [[d1_databases]]
 binding = "DB"
 database_name = "code-davinci"
-database_id = "local-dev-placeholder"
+database_id = "217ba6ea-462f-4e02-8544-87852355ffea"
 migrations_dir = "drizzle"

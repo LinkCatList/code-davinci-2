@@ -2,10 +2,16 @@
 
 **Дата:** 2026-08-14
 **Источник:** `PRD.md` (Draft v1)
-**Статус:** утверждён (rev.2). В работе: M1.
+**Статус:** утверждён (rev.2). M1 и срез 02 сделаны. В работе: срез 03 `/profile`.
 **Скоуп:** полный MVP, милестоуны M1–M5 по §12 PRD
 
 Изменения rev.2 — см. §16.
+
+### Срезы
+
+| Срез | Файл | Зависит от | Статус |
+|---|---|---|---|
+| 02 — онбординг `/start` | [slices/02-onboarding.md](slices/02-onboarding.md) | M1 | реализован, задеплоен |
 
 ---
 
@@ -321,12 +327,15 @@ Webhook-redelivery может продублировать `like`/`skip` events 
 
 ### M2 — Profiles
 
+Срез [02-onboarding](slices/02-onboarding.md) закрывает п.1–2 без ленты и без `/profile` edit (своя карточка после confirm).
+
 1. Conversation `onboarding` по §10.2: `external`/`now`, halt на `/командах`, `onboarding_start`, все валидации, username-warning.
-2. Превью + confirm → `state=NULL`, `profile_complete`, первая карточка.
-3. `/profile` + `editField` (все поля, включая birth_year/gender).
+2. Превью + confirm → `state=NULL`, `profile_complete`, своя карточка (не лента).
+3. `/profile` + `editField` (все поля, включая birth_year/gender) — **следующий срез**, не 02.
 4. Повторный `/start` и `/cancel`.
 
-**Done when:** пользователь регистрируется и видит свою карточку; редактирование работает; `/feed` в середине онбординга не становится именем.
+**Done when (срез 02):** пользователь регистрируется и видит свою карточку; `/feed` в середине онбординга не становится именем.  
+**Done when (весь M2):** плюс редактирование `/profile`.
 
 ### M3 — Feed
 
