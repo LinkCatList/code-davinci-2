@@ -5,7 +5,6 @@ export const ru: { [K in keyof typeof en]: string } = {
   cmdStart: "Начать / продолжить",
   cmdFeed: "Лента",
   cmdProfile: "Профиль",
-  cmdMatches: "Мэтчи",
   cmdFilters: "Фильтры",
   cmdLanguage: "Язык",
   cmdDelete: "Удалить данные",
@@ -58,4 +57,8 @@ export const ru: { [K in keyof typeof en]: string } = {
   feedLike: "👍 Лайк",
   feedSkip: "👎 Скип",
   feedEmpty: "Пока никого нет. Загляни позже.",
+  likeDigest: "Новые лайки: {n}.",
+  matchTitle: "Мэтч.",
+  matchPendingViewer: "Мэтч. У них нет @username — пока не могу отдать профиль.",
+  matchPendingOther: "У тебя мэтч. Поставь @username в настройках Telegram, чтобы с тобой могли связаться.",
 };

@@ -29,7 +29,6 @@ const commands = (d: typeof ru) => [
   { command: "start", description: d.cmdStart },
   { command: "feed", description: d.cmdFeed },
   { command: "profile", description: d.cmdProfile },
-  { command: "matches", description: d.cmdMatches },
   { command: "filters", description: d.cmdFilters },
   { command: "language", description: d.cmdLanguage },
   { command: "delete", description: d.cmdDelete },

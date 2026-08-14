@@ -12,6 +12,7 @@ import {
   type UserRecord,
 } from "../db/queries";
 import { renderOwnCard } from "./card";
+import { processNewLike } from "./match";
 import { t, type Locale } from "../t";
 
 type FeedContext = Context & {
@@ -113,6 +114,7 @@ export async function handleFeedCallback(ctx: FeedContext): Promise<void> {
       : await insertSkip(ctx.db, viewer.id, toUser);
   if (inserted) {
     await insertEvent(ctx.db, viewer.id, action === "like" ? "like" : "skip");
+    if (action === "like") await processNewLike(ctx, viewer, toUser);
   }
   await replyNextFeedCard(ctx);
 }

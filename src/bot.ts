@@ -14,13 +14,14 @@ import { d1SessionStorage } from "./db/session-storage";
 import type { Env } from "./env";
 import { renderOwnCard } from "./flows/card";
 import { handleFeedCallback, handleFeedCommand } from "./flows/feed";
+import { flushPendingReveals } from "./flows/match";
 import { onboarding, type OutsideContext } from "./flows/onboarding";
 import { editProfile, handleProfileCallback, handleProfileCommand } from "./flows/profile";
 import { t } from "./t";
 
 export type BotContext = OutsideContext;
 
-const STUB_COMMANDS = ["matches", "filters", "language", "delete"] as const;
+const STUB_COMMANDS = ["filters", "language", "delete"] as const;
 
 async function showOwnCard(ctx: BotContext): Promise<void> {
   if (!ctx.from) return;
@@ -65,6 +66,11 @@ export function createBot(
     if (!ctx.from) return;
     const { locale } = await upsertUser(ctx.db, ctx.from);
     ctx.locale = locale;
+    await next();
+  });
+
+  bot.use(async (ctx, next) => {
+    await flushPendingReveals(ctx);
     await next();
   });
 

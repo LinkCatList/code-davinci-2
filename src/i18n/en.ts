@@ -3,7 +3,6 @@ export const en = {
   cmdStart: "Start / continue",
   cmdFeed: "Feed",
   cmdProfile: "Profile",
-  cmdMatches: "Matches",
   cmdFilters: "Filters",
   cmdLanguage: "Language",
   cmdDelete: "Delete my data",
@@ -56,4 +55,8 @@ export const en = {
   feedLike: "👍 Like",
   feedSkip: "👎 Skip",
   feedEmpty: "No more people right now. Check later.",
+  likeDigest: "You have {n} new likes.",
+  matchTitle: "It's a match.",
+  matchPendingViewer: "It's a match. They need a Telegram @username before I can share the profile.",
+  matchPendingOther: "You matched with someone. Set a @username in Telegram settings so they can reach you.",
 };

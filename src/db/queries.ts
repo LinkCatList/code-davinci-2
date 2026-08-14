@@ -1,16 +1,17 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, lt, or } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { distanceBetween } from "../geo";
 import { now } from "../now";
 import { localeFromTelegram, type Locale } from "../t";
 import * as schema from "./schema";
-import { events, likes, skips, snippets, users } from "./schema";
+import { events, likes, matches, skips, snippets, users } from "./schema";
 
 export type Db = DrizzleD1Database<typeof schema>;
 
 export type UserRecord = typeof users.$inferSelect;
 export type SnippetRecord = typeof snippets.$inferSelect;
-export type EventType = "onboarding_start" | "profile_complete" | "like" | "skip";
+export type EventType = "onboarding_start" | "profile_complete" | "like" | "skip" | "match";
+export type MatchRecord = typeof matches.$inferSelect;
 
 export async function upsertUser(
   db: Db,
@@ -220,6 +221,117 @@ export async function deleteSnippet(
     }
   }
   return "ok";
+}
+
+export async function hasReciprocalLike(
+  db: Db,
+  fromUser: number,
+  toUser: number,
+): Promise<boolean> {
+  const row = await db
+    .select({ id: likes.id })
+    .from(likes)
+    .where(and(eq(likes.fromUser, toUser), eq(likes.toUser, fromUser)))
+    .get();
+  return row !== undefined;
+}
+
+export async function insertMatch(db: Db, userX: number, userY: number): Promise<MatchRecord | null> {
+  const userA = Math.min(userX, userY);
+  const userB = Math.max(userX, userY);
+  const existing = await db
+    .select()
+    .from(matches)
+    .where(and(eq(matches.userA, userA), eq(matches.userB, userB)))
+    .get();
+  if (existing) return null;
+  try {
+    await db.insert(matches).values({
+      userA,
+      userB,
+      createdAt: now(),
+    });
+  } catch {
+    return null;
+  }
+  const created = await db
+    .select()
+    .from(matches)
+    .where(and(eq(matches.userA, userA), eq(matches.userB, userB)))
+    .get();
+  return created ?? null;
+}
+
+export async function setMatchRevealed(
+  db: Db,
+  matchId: number,
+  side: "a" | "b",
+): Promise<void> {
+  await db
+    .update(matches)
+    .set(side === "a" ? { revealedA: 1 } : { revealedB: 1 })
+    .where(eq(matches.id, matchId));
+}
+
+export async function listMatchesForUser(
+  db: Db,
+  userId: number,
+): Promise<{ match: MatchRecord; other: UserRecord; meIsA: boolean }[]> {
+  const rows = await db
+    .select()
+    .from(matches)
+    .where(or(eq(matches.userA, userId), eq(matches.userB, userId)))
+    .all();
+  const result: { match: MatchRecord; other: UserRecord; meIsA: boolean }[] = [];
+  for (const match of rows) {
+    const meIsA = match.userA === userId;
+    const other = await getUser(db, meIsA ? match.userB : match.userA);
+    if (other) result.push({ match, other, meIsA });
+  }
+  return result;
+}
+
+export async function setUserInactive(db: Db, userId: number): Promise<void> {
+  await db.update(users).set({ isActive: 0 }).where(eq(users.id, userId));
+}
+
+export async function claimLikeDigest(
+  db: Db,
+  toUser: number,
+): Promise<{ n: number; locale: string } | null> {
+  const user = await getUser(db, toUser);
+  if (!user || user.isFake === 1 || user.isActive !== 1) return null;
+  const ts = now();
+  const windowStart = ts - 86400;
+  const claimed = await db
+    .update(users)
+    .set({ lastLikeNotifAt: ts })
+    .where(
+      and(
+        eq(users.id, toUser),
+        eq(users.isActive, 1),
+        eq(users.isFake, 0),
+        or(isNull(users.lastLikeNotifAt), lt(users.lastLikeNotifAt, windowStart)),
+      ),
+    )
+    .returning({ id: users.id });
+  if (claimed.length === 0) return null;
+
+  const since = user.lastLikeNotifAt;
+  const incoming = await db
+    .select({ fromUser: likes.fromUser })
+    .from(likes)
+    .where(
+      since == null
+        ? eq(likes.toUser, toUser)
+        : and(eq(likes.toUser, toUser), gt(likes.createdAt, since)),
+    )
+    .all();
+  const paired = await listMatchesForUser(db, toUser);
+  const matched = new Set(paired.map((row) => row.other.id));
+  const n = incoming.filter((row) => !matched.has(row.fromUser)).length;
+  if (n === 0) return null;
+  return { n, locale: user.locale };
 }
 
 export function isOnboarding(user: UserRecord): boolean {
