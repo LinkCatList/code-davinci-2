@@ -18,6 +18,8 @@ export const users = sqliteTable("users", {
   isFake: integer("is_fake").notNull().default(0),
   lastActiveAt: integer("last_active_at").notNull(),
   lastLikeNotifAt: integer("last_like_notif_at"),
+  lastCardUserId: integer("last_card_user_id"),
+  browseMode: text("browse_mode"),
   createdAt: integer("created_at").notNull(),
 });
 

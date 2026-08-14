@@ -1,6 +1,6 @@
 import { InlineKeyboard, type Context } from "grammy";
-import { countIncomingLikes, deleteSnippet, getUser, isOnboarding, listSnippets } from "../db/queries";
-import { renderOwnCard } from "./card";
+import { deleteSnippet, getUser, isOnboarding, listSnippets, setBrowseState } from "../db/queries";
+import { t, type Locale } from "../t";
 import {
   askBio,
   askGender,
@@ -15,7 +15,7 @@ import {
   waitUpdate,
   type OutsideContext,
 } from "./onboarding";
-import { t, type Locale } from "../t";
+import { ownCardMessage, isPausedUser, replyPaused, replyProfileScreen } from "./screens";
 
 const EDIT_FIELDS = ["name", "year", "gender", "bio", "loc", "snippets"] as const;
 type EditField = (typeof EDIT_FIELDS)[number];
@@ -24,40 +24,18 @@ function isEditField(value: string): value is EditField {
   return (EDIT_FIELDS as readonly string[]).includes(value);
 }
 
-function editKeyboard(locale: Locale, likesCount: number): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, "likesButton", { n: likesCount }), "lk:open")
-    .row()
-    .text(t(locale, "editName"), "pf:name")
-    .text(t(locale, "editYear"), "pf:year")
-    .row()
-    .text(t(locale, "editGender"), "pf:gender")
-    .text(t(locale, "editBio"), "pf:bio")
-    .row()
-    .text(t(locale, "editLocation"), "pf:loc")
-    .row()
-    .text(t(locale, "editSnippets"), "pf:snippets");
-}
-
 export async function replyProfile(ctx: OutsideContext): Promise<void> {
   if (!ctx.from) return;
   const user = await getUser(ctx.db, ctx.from.id);
-  if (!user || user.name === null || user.birthYear === null) return;
-  const snippets = await listSnippets(ctx.db, user.id);
-  const likesCount = await countIncomingLikes(ctx.db, user.id);
-  await ctx.reply(
-    renderOwnCard({
-      name: user.name,
-      birthYear: user.birthYear,
-      bio: user.bio,
-      city: user.city,
-      snippets,
-      nowMs: Date.now(),
-      includeAllSnippets: true,
-      footer: t(ctx.locale, "profileEditHint"),
-    }),
-    { parse_mode: "HTML", reply_markup: editKeyboard(ctx.locale, likesCount) },
-  );
+  if (!user || isOnboarding(user)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  if (isPausedUser(user)) {
+    await replyPaused(ctx);
+    return;
+  }
+  await replyProfileScreen(ctx);
 }
 
 async function replyProfileFromConversation(
@@ -71,23 +49,12 @@ async function replyProfileFromConversation(
     const user = await getUser(outer.db, outer.from.id);
     if (!user || user.name === null || user.birthYear === null) return null;
     const snippets = await listSnippets(outer.db, user.id);
-    const likesCount = await countIncomingLikes(outer.db, user.id);
-    return { user, snippets, likesCount };
+    await setBrowseState(outer.db, user.id, "profile", null);
+    return { user, snippets };
   });
   if (!data) return;
-  await ctx.reply(
-    renderOwnCard({
-      name: data.user.name ?? "",
-      birthYear: data.user.birthYear ?? 0,
-      bio: data.user.bio,
-      city: data.user.city,
-      snippets: data.snippets,
-      nowMs,
-      includeAllSnippets: true,
-      footer: t(locale, "profileEditHint"),
-    }),
-    { parse_mode: "HTML", reply_markup: editKeyboard(locale, data.likesCount) },
-  );
+  const { html, keyboard } = ownCardMessage(data.user, data.snippets, nowMs, locale, "profile");
+  await ctx.reply(html, { parse_mode: "HTML", reply_markup: keyboard });
 }
 
 async function editSnippets(
@@ -177,12 +144,6 @@ export async function editProfile(
 }
 
 export async function handleProfileCommand(ctx: OutsideContext): Promise<void> {
-  if (!ctx.from) return;
-  const user = await getUser(ctx.db, ctx.from.id);
-  if (!user || isOnboarding(user)) {
-    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
-    return;
-  }
   await replyProfile(ctx);
 }
 
@@ -202,8 +163,27 @@ export async function handleProfileCallback(ctx: OutsideContext): Promise<void> 
     await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
     return;
   }
+  if (isPausedUser(user)) {
+    await replyPaused(ctx);
+    return;
+  }
   const field = data.slice("pf:".length);
   if (!isEditField(field)) return;
+  if (ctx.conversation.active("editProfile") > 0) return;
+  await ctx.conversation.enter("editProfile", field);
+}
+
+export async function startProfileEdit(ctx: OutsideContext, field: "bio" | "snippets"): Promise<void> {
+  if (!ctx.from) return;
+  const user = await getUser(ctx.db, ctx.from.id);
+  if (!user || isOnboarding(user)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  if (isPausedUser(user)) {
+    await replyPaused(ctx);
+    return;
+  }
   if (ctx.conversation.active("editProfile") > 0) return;
   await ctx.conversation.enter("editProfile", field);
 }

@@ -31,7 +31,6 @@ export async function upsertUser(
       .set({
         username: from.username ?? null,
         lastActiveAt: ts,
-        isActive: 1,
       })
       .where(eq(users.id, from.id));
     return { locale: existing.locale === "ru" ? "ru" : "en" };
@@ -90,13 +89,15 @@ export async function clearOnboardingFields(db: Db, userId: number): Promise<voi
       lat: null,
       lng: null,
       state: "onboarding:name",
+      lastCardUserId: null,
+      browseMode: null,
     })
     .where(eq(users.id, userId));
   await db.delete(snippets).where(eq(snippets.userId, userId));
 }
 
 export async function completeProfile(db: Db, userId: number): Promise<void> {
-  await db.update(users).set({ state: null }).where(eq(users.id, userId));
+  await db.update(users).set({ state: null, isActive: 1 }).where(eq(users.id, userId));
   await insertEventOnce(db, userId, "profile_complete");
 }
 
@@ -315,6 +316,26 @@ export async function listMatchesForUser(
 
 export async function setUserInactive(db: Db, userId: number): Promise<void> {
   await db.update(users).set({ isActive: 0 }).where(eq(users.id, userId));
+}
+
+export async function setBrowseState(
+  db: Db,
+  userId: number,
+  browseMode: string | null,
+  lastCardUserId: number | null,
+): Promise<void> {
+  await db.update(users).set({ browseMode, lastCardUserId }).where(eq(users.id, userId));
+}
+
+export async function setUserPaused(db: Db, userId: number): Promise<void> {
+  await db
+    .update(users)
+    .set({ isActive: 0, lastCardUserId: null, browseMode: "paused" })
+    .where(eq(users.id, userId));
+}
+
+export async function resumeUser(db: Db, userId: number): Promise<void> {
+  await db.update(users).set({ isActive: 1 }).where(eq(users.id, userId));
 }
 
 export async function claimLikeDigest(

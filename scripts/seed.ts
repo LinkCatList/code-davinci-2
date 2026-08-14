@@ -704,10 +704,144 @@ export function compact<T>(xs: Array<T | null | undefined>): T[] {
       },
     ],
   },
+  {
+    name: "Настя",
+    locale: "ru",
+    gender: 1,
+    birthYear: 1997,
+    bio: "графика, C++, и вечный спор про руки vs движок",
+    city: "Новосибирск",
+    lat: 55.0084,
+    lng: 82.9357,
+    snippets: [
+      {
+        language: "C++",
+        content: `struct Vec2 {
+  float x = 0;
+  float y = 0;
+  Vec2 operator+(const Vec2& o) const { return {x + o.x, y + o.y}; }
+};
+
+float length2(const Vec2& v) { return v.x * v.x + v.y * v.y; }`,
+      },
+    ],
+  },
+  {
+    name: "Theo",
+    locale: "en",
+    gender: 0,
+    birthYear: 1993,
+    bio: "wasm, rust, and build times I pretend not to notice",
+    city: "Lisbon",
+    lat: 38.7223,
+    lng: -9.1393,
+    snippets: [
+      {
+        language: "Rust",
+        content: `pub fn split_once_owned(input: &str, sep: char) -> Option<(String, String)> {
+    let (left, right) = input.split_once(sep)?;
+    Some((left.to_string(), right.to_string()))
+}
+
+pub fn nonempty(s: &str) -> Option<&str> {
+    let t = s.trim();
+    if t.is_empty() { None } else { Some(t) }
+}`,
+      },
+    ],
+  },
+  {
+    name: "Вика",
+    locale: "ru",
+    gender: 1,
+    birthYear: 2000,
+    bio: "iOS. если навигация сломалась — это я её чинила вчера",
+    city: "Прага",
+    lat: 50.0755,
+    lng: 14.4378,
+    snippets: [
+      {
+        language: "Swift",
+        content: `enum Load<T> {
+    case idle
+    case loading
+    case ready(T)
+    case failed(String)
+}
+
+func mapLoad<T, U>(_ value: Load<T>, _ f: (T) -> U) -> Load<U> {
+    if case .ready(let x) = value { return .ready(f(x)) }
+    if case .failed(let e) = value { return .failed(e) }
+    if case .loading = value { return .loading }
+    return .idle
+}`,
+      },
+    ],
+  },
+  {
+    name: "Hugo",
+    locale: "en",
+    gender: 0,
+    birthYear: 1996,
+    bio: "C# services. I name things twice and still get it wrong",
+    city: "Amsterdam",
+    lat: 52.3676,
+    lng: 4.9041,
+    snippets: [
+      {
+        language: "C#",
+        content: `public sealed class RateLimit
+{
+    private readonly Queue<DateTimeOffset> _hits = new();
+    private readonly int _max;
+    private readonly TimeSpan _window;
+
+    public RateLimit(int max, TimeSpan window)
+    {
+        _max = max;
+        _window = window;
+    }
+
+    public bool TryHit(DateTimeOffset now)
+    {
+        while (_hits.Count > 0 && now - _hits.Peek() > _window) _hits.Dequeue();
+        if (_hits.Count >= _max) return false;
+        _hits.Enqueue(now);
+        return true;
+    }
+}`,
+      },
+    ],
+  },
+  {
+    name: "Олег",
+    locale: "ru",
+    gender: 0,
+    birthYear: 1994,
+    bio: "sre. падаю раньше, чем падает прод. иногда",
+    city: "Хельсинки",
+    lat: 60.1699,
+    lng: 24.9384,
+    snippets: [
+      {
+        language: "Go",
+        content: `func backoff(attempt int) time.Duration {
+	if attempt < 0 {
+		attempt = 0
+	}
+	d := time.Millisecond * time.Duration(50<<attempt)
+	if d > 2*time.Second {
+		return 2 * time.Second
+	}
+	return d
+}`,
+      },
+    ],
+  },
 ];
 
-if (PROFILES.length !== 25) {
-  throw new Error(`expected 25 profiles, got ${PROFILES.length}`);
+if (PROFILES.length !== 30) {
+  throw new Error(`expected 30 profiles, got ${PROFILES.length}`);
 }
 
 function sqlText(value: string): string {

@@ -1,4 +1,4 @@
-import { GrammyError, InlineKeyboard, type Api, type Context } from "grammy";
+import { GrammyError, InlineKeyboard, type Api } from "grammy";
 import {
   type Db,
   type MatchRecord,
@@ -7,21 +7,24 @@ import {
   hasReciprocalLike,
   insertEvent,
   insertMatch,
+  isOnboarding,
   listMatchesForUser,
-  listSnippets,
   claimLikeDigest,
+  setBrowseState,
   setMatchRevealed,
   setUserInactive,
 } from "../db/queries";
-import { renderOwnCard } from "./card";
-import { distanceBetween } from "../geo";
+import { homeKeyboard } from "../keyboards";
+import { ageFromBirthYear, escapeHtml } from "./card";
+import { isPausedUser, replyPaused } from "./screens";
 import { isLocale, t, type Locale } from "../t";
+import type { OutsideContext } from "./onboarding";
 
-type MatchContext = Context & {
-  db: Db;
-  executionCtx: ExecutionContext;
-  locale: Locale;
-};
+type MatchContext = OutsideContext;
+
+function likesOpenKeyboard(locale: Locale): InlineKeyboard {
+  return new InlineKeyboard().text(t(locale, "likesOpen"), "lk:open");
+}
 
 function localeOf(user: UserRecord): Locale {
   return isLocale(user.locale) ? user.locale : "en";
@@ -41,30 +44,29 @@ async function safeSend(api: Api, db: Db, chatId: number, send: () => Promise<un
   }
 }
 
+function matchText(to: UserRecord, other: UserRecord, nowMs: number): string {
+  const locale = localeOf(to);
+  const age = other.birthYear != null ? ageFromBirthYear(other.birthYear, nowMs) : "?";
+  const place = other.city ? `, ${escapeHtml(other.city)}` : "";
+  return `${t(locale, "matchTitle")}\n\n<b>${escapeHtml(other.name ?? "")}</b>, ${age}${place}\nhttps://t.me/${other.username}`;
+}
+
 async function sendReveal(
   api: Api,
   db: Db,
   to: UserRecord,
-  viewer: UserRecord,
   other: UserRecord,
   nowMs: number,
 ): Promise<boolean> {
   if (to.isActive !== 1 || !other.username) return false;
   const locale = localeOf(to);
-  const snippets = await listSnippets(db, other.id);
-  const html = renderOwnCard({
-    name: other.name ?? "",
-    birthYear: other.birthYear ?? 0,
-    bio: other.bio,
-    city: other.city,
-    snippets,
-    nowMs,
-    distanceKm: distanceBetween(viewer, other),
-    includeAllSnippets: true,
-    header: t(locale, "matchTitle"),
-    footer: `https://t.me/${other.username}`,
-  });
-  return safeSend(api, db, to.id, () => api.sendMessage(to.id, html, { parse_mode: "HTML" }));
+  const html = matchText(to, other, nowMs);
+  return safeSend(api, db, to.id, () =>
+    api.sendMessage(to.id, html, {
+      parse_mode: "HTML",
+      reply_markup: homeKeyboard(locale),
+    }),
+  );
 }
 
 async function revealIfPossible(
@@ -78,47 +80,46 @@ async function revealIfPossible(
 ): Promise<void> {
   const already = recipientIsA ? match.revealedA === 1 : match.revealedB === 1;
   if (already || !other.username || recipient.isActive !== 1) return;
-  const sent = await sendReveal(api, db, recipient, recipient, other, nowMs);
+  const sent = await sendReveal(api, db, recipient, other, nowMs);
   if (sent) await setMatchRevealed(db, match.id, recipientIsA ? "a" : "b");
+}
+
+async function sendPending(
+  api: Api,
+  db: Db,
+  to: UserRecord,
+  key: "matchPendingViewer" | "matchPendingOther",
+): Promise<void> {
+  if (to.isActive !== 1) return;
+  const locale = localeOf(to);
+  await safeSend(api, db, to.id, () =>
+    api.sendMessage(to.id, t(locale, key), { reply_markup: homeKeyboard(locale) }),
+  );
 }
 
 export async function processNewLike(
   ctx: MatchContext,
   fromUser: UserRecord,
   toUserId: number,
-): Promise<void> {
+): Promise<boolean> {
   const toUser = await getUser(ctx.db, toUserId);
-  if (!toUser) return;
+  if (!toUser) return false;
 
   if (await hasReciprocalLike(ctx.db, fromUser.id, toUserId)) {
     const created = await insertMatch(ctx.db, fromUser.id, toUserId);
-    if (!created) return;
+    if (!created) return false;
     await insertEvent(ctx.db, fromUser.id, "match");
+    await setBrowseState(ctx.db, fromUser.id, "home", null);
+    await setBrowseState(ctx.db, toUser.id, "home", null);
     const nowMs = Date.now();
     await revealIfPossible(ctx.api, ctx.db, created, fromUser, toUser, created.userA === fromUser.id, nowMs);
     await revealIfPossible(ctx.api, ctx.db, created, toUser, fromUser, created.userA === toUser.id, nowMs);
 
-    if (!toUser.username && fromUser.isActive === 1) {
-      await safeSend(ctx.api, ctx.db, fromUser.id, () =>
-        ctx.api.sendMessage(fromUser.id, t(localeOf(fromUser), "matchPendingViewer")),
-      );
-    }
-    if (!fromUser.username && toUser.isActive === 1) {
-      await safeSend(ctx.api, ctx.db, toUser.id, () =>
-        ctx.api.sendMessage(toUser.id, t(localeOf(toUser), "matchPendingViewer")),
-      );
-    }
-    if (!fromUser.username && fromUser.isActive === 1) {
-      await safeSend(ctx.api, ctx.db, fromUser.id, () =>
-        ctx.api.sendMessage(fromUser.id, t(localeOf(fromUser), "matchPendingOther")),
-      );
-    }
-    if (!toUser.username && toUser.isActive === 1) {
-      await safeSend(ctx.api, ctx.db, toUser.id, () =>
-        ctx.api.sendMessage(toUser.id, t(localeOf(toUser), "matchPendingOther")),
-      );
-    }
-    return;
+    if (!toUser.username) await sendPending(ctx.api, ctx.db, fromUser, "matchPendingViewer");
+    if (!fromUser.username) await sendPending(ctx.api, ctx.db, toUser, "matchPendingViewer");
+    if (!fromUser.username) await sendPending(ctx.api, ctx.db, fromUser, "matchPendingOther");
+    if (!toUser.username) await sendPending(ctx.api, ctx.db, toUser, "matchPendingOther");
+    return true;
   }
 
   const digest = ctx.executionCtx.waitUntil(
@@ -128,12 +129,13 @@ export async function processNewLike(
       const locale = isLocale(claimed.locale) ? claimed.locale : "en";
       await safeSend(ctx.api, ctx.db, toUserId, () =>
         ctx.api.sendMessage(toUserId, t(locale, "likeDigest", { n: claimed.n }), {
-          reply_markup: new InlineKeyboard().text(t(locale, "likesOpen"), "lk:open"),
+          reply_markup: likesOpenKeyboard(locale),
         }),
       );
     })(),
   );
   void digest;
+  return false;
 }
 
 export async function flushPendingReveals(ctx: MatchContext): Promise<void> {
@@ -146,4 +148,38 @@ export async function flushPendingReveals(ctx: MatchContext): Promise<void> {
     await revealIfPossible(ctx.api, ctx.db, match, me, other, meIsA, nowMs);
     await revealIfPossible(ctx.api, ctx.db, match, other, me, !meIsA, nowMs);
   }
+}
+
+export async function handleMatchesCommand(ctx: OutsideContext): Promise<void> {
+  if (!ctx.from) return;
+  const me = await getUser(ctx.db, ctx.from.id);
+  if (!me || isOnboarding(me)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  if (isPausedUser(me)) {
+    await replyPaused(ctx);
+    return;
+  }
+  await setBrowseState(ctx.db, me.id, "home", null);
+  const pairs = await listMatchesForUser(ctx.db, me.id);
+  if (pairs.length === 0) {
+    await ctx.reply(t(ctx.locale, "matchesEmpty"), { reply_markup: homeKeyboard(ctx.locale) });
+    return;
+  }
+  const nowMs = Date.now();
+  const lines = [t(ctx.locale, "matchesTitle"), ""];
+  for (const { other } of pairs) {
+    const name = other.name ?? "?";
+    const age = other.birthYear != null ? String(ageFromBirthYear(other.birthYear, nowMs)) : "?";
+    const place = other.city ? `, ${other.city}` : "";
+    if (other.username) {
+      lines.push(`${name}, ${age}${place} — https://t.me/${other.username}`);
+    } else {
+      lines.push(`${name}, ${age}${place} — ${t(ctx.locale, "matchPendingWait")}`);
+    }
+  }
+  let text = lines.join("\n");
+  if (text.length > 4000) text = `${text.slice(0, 3990)}\n…`;
+  await ctx.reply(text, { reply_markup: homeKeyboard(ctx.locale) });
 }

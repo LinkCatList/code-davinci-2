@@ -9,15 +9,34 @@ import {
   getUser,
   insertEventOnce,
   insertSnippet,
+  isOnboarding,
   listSnippets,
   patchUser,
+  setBrowseState,
   type SnippetRecord,
   type UserRecord,
 } from "../db/queries";
-import { renderOwnCard } from "./card";
-import { likeSkipKeyboard, loadNextFeedCard } from "./feed";
+import {
+  homeKeyboard,
+  isReservedInput,
+  isSkipText,
+  matchGenderButton,
+  matchLangButton,
+  matchPreviewButton,
+  matchSnippetMoreButton,
+  onboardingGenderKeyboard,
+  onboardingLangKeyboard,
+  onboardingLocationKeyboard,
+  onboardingMoreKeyboard,
+  onboardingPreviewKeyboard,
+  onboardingSkipKeyboard,
+  profileKeyboard,
+  REMOVE_KEYBOARD,
+} from "../keyboards";
 import { isSnippetLanguage, SNIPPET_LANGUAGES } from "../snippet-languages";
 import { t, type Locale } from "../t";
+import { renderOwnCard } from "./card";
+import { ownCardMessage } from "./screens";
 
 export type OutsideContext = ConversationFlavor<
   Context & {
@@ -74,6 +93,20 @@ async function ackCallback(ctx: Context): Promise<void> {
   }
 }
 
+async function cancelMarkup(
+  conversation: OnboardingConversation,
+): Promise<typeof REMOVE_KEYBOARD | ReturnType<typeof profileKeyboard>> {
+  return conversation.external(async (outer) => {
+    if (!outer.from) return REMOVE_KEYBOARD;
+    const user = await getUser(outer.db, outer.from.id);
+    if (user && !isOnboarding(user)) {
+      await setBrowseState(outer.db, user.id, "profile", null);
+      return profileKeyboard(outer.locale);
+    }
+    return REMOVE_KEYBOARD;
+  });
+}
+
 async function handleMeta(
   conversation: OnboardingConversation,
   ctx: Context,
@@ -86,7 +119,7 @@ async function handleMeta(
     return true;
   }
   if (cmd === "cancel") {
-    await ctx.reply(cancelText);
+    await ctx.reply(cancelText, { reply_markup: await cancelMarkup(conversation) });
     await conversation.halt();
   }
   if (cmd) {
@@ -140,23 +173,6 @@ function localeOf(user: UserRecord): Locale {
   return user.locale === "ru" ? "ru" : "en";
 }
 
-function langKeyboard(locale: Locale): InlineKeyboard {
-  const keyboard = new InlineKeyboard();
-  keyboard.text(locale === "ru" ? "🇷🇺 RU ✓" : "🇷🇺 RU", "ob:lang:ru");
-  keyboard.text(locale === "en" ? "🇬🇧 EN ✓" : "🇬🇧 EN", "ob:lang:en");
-  return keyboard;
-}
-
-function genderKeyboard(locale: Locale): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, "onboardingGenderMale"), "ob:gender:0")
-    .text(t(locale, "onboardingGenderFemale"), "ob:gender:1");
-}
-
-function skipKeyboard(locale: Locale, data: string): InlineKeyboard {
-  return new InlineKeyboard().text(t(locale, "onboardingSkip"), data);
-}
-
 function snippetLangKeyboard(): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   SNIPPET_LANGUAGES.forEach((language, index) => {
@@ -166,18 +182,6 @@ function snippetLangKeyboard(): InlineKeyboard {
   return keyboard;
 }
 
-function snippetMoreKeyboard(locale: Locale): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, "onboardingSnippetAdd"), "ob:snip:more")
-    .text(t(locale, "onboardingSnippetDone"), "ob:snip:done");
-}
-
-function previewKeyboard(locale: Locale): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, "onboardingConfirm"), "ob:preview:ok")
-    .text(t(locale, "onboardingStartOver"), "ob:preview:reset");
-}
-
 async function askLanguage(
   conversation: OnboardingConversation,
   ctx: Context,
@@ -185,7 +189,7 @@ async function askLanguage(
 ): Promise<Locale> {
   const send = async (target: Context) => {
     await target.reply(t(locale, "startWelcome"));
-    await target.reply(t(locale, "onboardingLang"), { reply_markup: langKeyboard(locale) });
+    await target.reply(t(locale, "onboardingLang"), { reply_markup: onboardingLangKeyboard(locale) });
   };
   await send(ctx);
   for (;;) {
@@ -197,7 +201,12 @@ async function askLanguage(
       await saveUser(conversation, { locale: picked });
       return picked;
     }
-    await next.reply(t(locale, "onboardingLang"), { reply_markup: langKeyboard(locale) });
+    const fromText = next.message?.text ? matchLangButton(next.message.text) : null;
+    if (fromText) {
+      await saveUser(conversation, { locale: fromText });
+      return fromText;
+    }
+    await next.reply(t(locale, "onboardingLang"), { reply_markup: onboardingLangKeyboard(locale) });
   }
 }
 
@@ -208,16 +217,21 @@ export async function askName(
   cancelText?: string,
 ): Promise<void> {
   const stop = cancelText ?? t(locale, "onboardingCancelled");
-  const send = (target: Context) => target.reply(t(locale, "onboardingName"));
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingName"), { reply_markup: REMOVE_KEYBOARD });
   await send(ctx);
   for (;;) {
     const next = await waitUpdate(conversation, send, stop);
     const text = next.message?.text?.trim();
+    if (text && isReservedInput(text)) {
+      await next.reply(t(locale, "onboardingNameBad"), { reply_markup: REMOVE_KEYBOARD });
+      continue;
+    }
     if (text && text.length >= 1 && text.length <= 50) {
       await saveUser(conversation, { name: text });
       return;
     }
-    await next.reply(t(locale, "onboardingNameBad"));
+    await next.reply(t(locale, "onboardingNameBad"), { reply_markup: REMOVE_KEYBOARD });
   }
 }
 
@@ -228,20 +242,21 @@ export async function askYear(
   cancelText?: string,
 ): Promise<void> {
   const stop = cancelText ?? t(locale, "onboardingCancelled");
-  const send = (target: Context) => target.reply(t(locale, "onboardingYear"));
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingYear"), { reply_markup: REMOVE_KEYBOARD });
   await send(ctx);
   for (;;) {
     const next = await waitUpdate(conversation, send, stop);
     const text = next.message?.text?.trim();
     if (!text || !/^\d{4}$/.test(text)) {
-      await next.reply(t(locale, "onboardingYearBad"));
+      await next.reply(t(locale, "onboardingYearBad"), { reply_markup: REMOVE_KEYBOARD });
       continue;
     }
     const year = Number(text);
     const nowMs = await conversation.now();
     const currentYear = new Date(nowMs).getUTCFullYear();
     if (year < currentYear - 120 || year > currentYear) {
-      await next.reply(t(locale, "onboardingYearBad"));
+      await next.reply(t(locale, "onboardingYearBad"), { reply_markup: REMOVE_KEYBOARD });
       continue;
     }
     await saveUser(conversation, { birthYear: year });
@@ -257,7 +272,7 @@ export async function askGender(
 ): Promise<void> {
   const stop = cancelText ?? t(locale, "onboardingCancelled");
   const send = (target: Context) =>
-    target.reply(t(locale, "onboardingGender"), { reply_markup: genderKeyboard(locale) });
+    target.reply(t(locale, "onboardingGender"), { reply_markup: onboardingGenderKeyboard(locale) });
   await send(ctx);
   for (;;) {
     const next = await waitUpdate(conversation, send, stop);
@@ -267,7 +282,14 @@ export async function askGender(
       await saveUser(conversation, { gender: data.endsWith("1") ? 1 : 0 });
       return;
     }
-    await next.reply(t(locale, "onboardingGenderBad"), { reply_markup: genderKeyboard(locale) });
+    const fromText = next.message?.text ? matchGenderButton(next.message.text, locale) : null;
+    if (fromText !== null) {
+      await saveUser(conversation, { gender: fromText });
+      return;
+    }
+    await next.reply(t(locale, "onboardingGenderBad"), {
+      reply_markup: onboardingGenderKeyboard(locale),
+    });
   }
 }
 
@@ -279,7 +301,7 @@ export async function askBio(
 ): Promise<void> {
   const stop = cancelText ?? t(locale, "onboardingCancelled");
   const send = (target: Context) =>
-    target.reply(t(locale, "onboardingBio"), { reply_markup: skipKeyboard(locale, "ob:skip:bio") });
+    target.reply(t(locale, "onboardingBio"), { reply_markup: onboardingSkipKeyboard(locale) });
   await send(ctx);
   for (;;) {
     const next = await waitUpdate(conversation, send, stop);
@@ -290,6 +312,16 @@ export async function askBio(
     }
     const text = next.message?.text;
     if (text !== undefined) {
+      if (isSkipText(text, locale)) {
+        await saveUser(conversation, { bio: null });
+        return;
+      }
+      if (isReservedInput(text)) {
+        await next.reply(t(locale, "onboardingBioBad"), {
+          reply_markup: onboardingSkipKeyboard(locale),
+        });
+        continue;
+      }
       const trimmed = text.trim();
       if (trimmed.length === 0) {
         await saveUser(conversation, { bio: null });
@@ -297,7 +329,7 @@ export async function askBio(
       }
       if (trimmed.length > 300) {
         await next.reply(t(locale, "onboardingBioBad"), {
-          reply_markup: skipKeyboard(locale, "ob:skip:bio"),
+          reply_markup: onboardingSkipKeyboard(locale),
         });
         continue;
       }
@@ -305,7 +337,7 @@ export async function askBio(
       return;
     }
     await next.reply(t(locale, "onboardingBioBad"), {
-      reply_markup: skipKeyboard(locale, "ob:skip:bio"),
+      reply_markup: onboardingSkipKeyboard(locale),
     });
   }
 }
@@ -319,7 +351,7 @@ export async function askLocation(
   const stop = cancelText ?? t(locale, "onboardingCancelled");
   const send = (target: Context) =>
     target.reply(t(locale, "onboardingLocation"), {
-      reply_markup: skipKeyboard(locale, "ob:skip:loc"),
+      reply_markup: onboardingLocationKeyboard(locale),
     });
   await send(ctx);
   for (;;) {
@@ -340,11 +372,21 @@ export async function askLocation(
     }
     const text = next.message?.text?.trim();
     if (text) {
+      if (isSkipText(text, locale)) {
+        await saveUser(conversation, { city: null, lat: null, lng: null });
+        return;
+      }
+      if (isReservedInput(text)) {
+        await next.reply(t(locale, "onboardingLocationBad"), {
+          reply_markup: onboardingLocationKeyboard(locale),
+        });
+        continue;
+      }
       await saveUser(conversation, { city: text, lat: null, lng: null });
       return;
     }
     await next.reply(t(locale, "onboardingLocationBad"), {
-      reply_markup: skipKeyboard(locale, "ob:skip:loc"),
+      reply_markup: onboardingLocationKeyboard(locale),
     });
   }
 }
@@ -356,21 +398,26 @@ export async function askSnippetText(
   cancelText?: string,
 ): Promise<string> {
   const stop = cancelText ?? t(locale, "onboardingCancelled");
-  const send = (target: Context) => target.reply(t(locale, "onboardingSnippet"));
+  const send = (target: Context) =>
+    target.reply(t(locale, "onboardingSnippet"), { reply_markup: REMOVE_KEYBOARD });
   await send(ctx);
   for (;;) {
     const next = await waitUpdate(conversation, send, stop);
     if (next.message?.photo) {
-      await next.reply(t(locale, "onboardingSnippetBad"));
+      await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
       continue;
     }
     const text = next.message?.text;
     if (text !== undefined) {
+      if (isReservedInput(text)) {
+        await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
+        continue;
+      }
       if (text.length >= 1 && text.length <= 1500) {
         return text;
       }
     }
-    await next.reply(t(locale, "onboardingSnippetBad"));
+    await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
   }
 }
 
@@ -427,7 +474,7 @@ async function askMoreSnippets(
   while (count < 3) {
     const send = (target: Context) =>
       target.reply(t(locale, "onboardingSnippetMore"), {
-        reply_markup: snippetMoreKeyboard(locale),
+        reply_markup: onboardingMoreKeyboard(locale),
       });
     await send(ctx);
     let add = false;
@@ -444,8 +491,15 @@ async function askMoreSnippets(
         ctx = next;
         break;
       }
+      const fromText = next.message?.text ? matchSnippetMoreButton(next.message.text, locale) : null;
+      if (fromText === "done") return;
+      if (fromText === "add") {
+        add = true;
+        ctx = next;
+        break;
+      }
       await next.reply(t(locale, "onboardingSnippetMore"), {
-        reply_markup: snippetMoreKeyboard(locale),
+        reply_markup: onboardingMoreKeyboard(locale),
       });
     }
     if (!add) return;
@@ -472,10 +526,14 @@ async function askPreview(
     snippets,
     nowMs,
     includeAllSnippets: true,
+    header: t(locale, "ownCardFrame"),
     footer: t(locale, "onboardingPreview"),
   });
   const send = async (target: Context) => {
-    await target.reply(card, { parse_mode: "HTML", reply_markup: previewKeyboard(locale) });
+    await target.reply(card, {
+      parse_mode: "HTML",
+      reply_markup: onboardingPreviewKeyboard(locale),
+    });
   };
   await send(ctx);
   for (;;) {
@@ -485,7 +543,11 @@ async function askPreview(
       await dropMarkup(next);
       return data.endsWith("ok") ? "ok" : "reset";
     }
-    await next.reply(t(locale, "onboardingPreviewBad"), { reply_markup: previewKeyboard(locale) });
+    const fromText = next.message?.text ? matchPreviewButton(next.message.text, locale) : null;
+    if (fromText) return fromText;
+    await next.reply(t(locale, "onboardingPreviewBad"), {
+      reply_markup: onboardingPreviewKeyboard(locale),
+    });
   }
 }
 
@@ -581,21 +643,21 @@ export async function onboarding(conversation: OnboardingConversation, ctx: Cont
     if (!username) {
       await ctx.reply(t(locale, "onboardingUsernameWarn"));
     }
+
     const nowMs = await conversation.now();
-    const feed = await conversation.external(async (outer) => {
+    const home = await conversation.external(async (outer) => {
       if (!outer.from) return null;
       const viewer = await getUser(outer.db, outer.from.id);
-      if (!viewer) return null;
-      return loadNextFeedCard(outer.db, viewer, nowMs);
+      if (!viewer || viewer.name === null || viewer.birthYear === null) return null;
+      const all = await listSnippets(outer.db, viewer.id);
+      await setBrowseState(outer.db, viewer.id, "home", null);
+      return ownCardMessage(viewer, all, nowMs, locale, "home");
     });
-    if (!feed) {
-      await ctx.reply(t(locale, "feedEmpty"));
+    if (!home) {
+      await ctx.reply(t(locale, "onboardingMissingUser"));
       return;
     }
-    await ctx.reply(feed.html, {
-      parse_mode: "HTML",
-      reply_markup: likeSkipKeyboard(locale, feed.candidateId),
-    });
+    await ctx.reply(home.html, { parse_mode: "HTML", reply_markup: homeKeyboard(locale) });
     return;
   }
 }

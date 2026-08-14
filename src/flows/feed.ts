@@ -1,6 +1,4 @@
-import { InlineKeyboard, type Context } from "grammy";
 import {
-  type Db,
   getUser,
   insertEvent,
   insertLike,
@@ -10,42 +8,25 @@ import {
   listIncomingLikers,
   listSnippets,
   pickCandidate,
+  resumeUser,
+  setBrowseState,
   type UserRecord,
 } from "../db/queries";
 import { distanceBetween } from "../geo";
+import { browseKeyboard, homeKeyboard } from "../keyboards";
+import { t } from "../t";
 import { renderOwnCard } from "./card";
-import { processNewLike } from "./match";
-import { t, type Locale } from "../t";
-
-type FeedContext = Context & {
-  db: Db;
-  locale: Locale;
-  executionCtx: ExecutionContext;
-};
+import { flushPendingReveals, processNewLike } from "./match";
+import type { OutsideContext } from "./onboarding";
+import { isPausedUser, replyHome, replyPaused } from "./screens";
 
 export type FeedCard = {
   html: string;
   candidateId: number;
 };
 
-export function likeSkipKeyboard(locale: Locale, candidateId: number): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, "feedLike"), `fd:like:${candidateId}`)
-    .text(t(locale, "feedSkip"), `fd:skip:${candidateId}`);
-}
-
-export function inboxLikeSkipKeyboard(locale: Locale, candidateId: number): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, "feedLike"), `lk:like:${candidateId}`)
-    .text(t(locale, "feedSkip"), `lk:skip:${candidateId}`);
-}
-
-export function likesOpenKeyboard(locale: Locale): InlineKeyboard {
-  return new InlineKeyboard().text(t(locale, "likesOpen"), "lk:open");
-}
-
-export async function loadNextFeedCard(
-  db: Db,
+async function loadNextFeedCard(
+  db: OutsideContext["db"],
   viewer: UserRecord,
   nowMs: number,
 ): Promise<FeedCard | null> {
@@ -73,29 +54,11 @@ export async function loadNextFeedCard(
   return null;
 }
 
-export async function replyNextFeedCard(ctx: FeedContext): Promise<void> {
-  if (!ctx.from) return;
-  const viewer = await getUser(ctx.db, ctx.from.id);
-  if (!viewer || isOnboarding(viewer)) {
-    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
-    return;
-  }
-  const card = await loadNextFeedCard(ctx.db, viewer, Date.now());
-  if (!card) {
-    await ctx.reply(t(ctx.locale, "feedEmpty"));
-    return;
-  }
-  await ctx.reply(card.html, {
-    parse_mode: "HTML",
-    reply_markup: likeSkipKeyboard(ctx.locale, card.candidateId),
-  });
-}
-
 async function loadNextIncomingCard(
-  db: Db,
+  db: OutsideContext["db"],
   viewer: UserRecord,
   nowMs: number,
-  locale: Locale,
+  locale: OutsideContext["locale"],
 ): Promise<FeedCard | null> {
   const likers = await listIncomingLikers(db, viewer.id);
   for (const liker of likers) {
@@ -111,32 +74,129 @@ async function loadNextIncomingCard(
         snippets,
         nowMs,
         distanceKm: distanceBetween(viewer, liker),
-        footer: t(locale, "likesCardHint"),
+        header: t(locale, "likesCardHint"),
       }),
     };
   }
   return null;
 }
 
-export async function replyNextIncomingLike(ctx: FeedContext): Promise<void> {
+async function sendCard(
+  ctx: OutsideContext,
+  card: FeedCard,
+  mode: "feed" | "inbox",
+): Promise<void> {
+  if (!ctx.from) return;
+  await setBrowseState(ctx.db, ctx.from.id, mode, card.candidateId);
+  await ctx.reply(card.html, {
+    parse_mode: "HTML",
+    reply_markup: browseKeyboard(ctx.locale),
+  });
+}
+
+async function sendEmpty(
+  ctx: OutsideContext,
+  key: "feedEmpty" | "likesEmpty",
+): Promise<void> {
+  if (!ctx.from) return;
+  await setBrowseState(ctx.db, ctx.from.id, "home", null);
+  await ctx.reply(t(ctx.locale, key), { reply_markup: homeKeyboard(ctx.locale) });
+}
+
+export async function replyNextFeedCard(ctx: OutsideContext): Promise<void> {
   if (!ctx.from) return;
   const viewer = await getUser(ctx.db, ctx.from.id);
   if (!viewer || isOnboarding(viewer)) {
     await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
     return;
   }
-  const card = await loadNextIncomingCard(ctx.db, viewer, Date.now(), ctx.locale);
+  const card = await loadNextFeedCard(ctx.db, viewer, Date.now());
   if (!card) {
-    await ctx.reply(t(ctx.locale, "likesEmpty"));
+    await sendEmpty(ctx, "feedEmpty");
     return;
   }
-  await ctx.reply(card.html, {
-    parse_mode: "HTML",
-    reply_markup: inboxLikeSkipKeyboard(ctx.locale, card.candidateId),
-  });
+  await sendCard(ctx, card, "feed");
 }
 
-export async function handleLikesOpen(ctx: FeedContext): Promise<void> {
+export async function replyNextIncomingLike(ctx: OutsideContext): Promise<void> {
+  if (!ctx.from) return;
+  const viewer = await getUser(ctx.db, ctx.from.id);
+  if (!viewer || isOnboarding(viewer)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  if (isPausedUser(viewer)) {
+    await replyPaused(ctx);
+    return;
+  }
+  const card = await loadNextIncomingCard(ctx.db, viewer, Date.now(), ctx.locale);
+  if (!card) {
+    await sendEmpty(ctx, "likesEmpty");
+    return;
+  }
+  await sendCard(ctx, card, "inbox");
+}
+
+export async function applySwipe(
+  ctx: OutsideContext,
+  viewer: UserRecord,
+  toUser: number,
+  action: "like" | "skip",
+): Promise<"match" | "swiped" | "ignored"> {
+  if (!Number.isFinite(toUser) || toUser === viewer.id) return "ignored";
+  const inserted =
+    action === "like"
+      ? await insertLike(ctx.db, viewer.id, toUser)
+      : await insertSkip(ctx.db, viewer.id, toUser);
+  if (!inserted) return "ignored";
+  await insertEvent(ctx.db, viewer.id, action === "like" ? "like" : "skip");
+  if (action === "like") {
+    const matched = await processNewLike(ctx, viewer, toUser);
+    if (matched) return "match";
+  }
+  return "swiped";
+}
+
+async function continueAfterSwipe(
+  ctx: OutsideContext,
+  mode: "feed" | "inbox",
+  result: "match" | "swiped" | "ignored",
+): Promise<void> {
+  if (result === "match") return;
+  if (mode === "inbox") await replyNextIncomingLike(ctx);
+  else await replyNextFeedCard(ctx);
+}
+
+export async function handleBrowseAction(
+  ctx: OutsideContext,
+  action: "like" | "skip" | "sleep",
+): Promise<void> {
+  if (!ctx.from) return;
+  const viewer = await getUser(ctx.db, ctx.from.id);
+  if (!viewer || isOnboarding(viewer)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  if (isPausedUser(viewer)) {
+    await replyPaused(ctx);
+    return;
+  }
+  if (action === "sleep") {
+    await replyHome(ctx);
+    return;
+  }
+  const target = viewer.lastCardUserId;
+  if (target == null) {
+    await setBrowseState(ctx.db, viewer.id, "home", null);
+    await ctx.reply(t(ctx.locale, "openCardsFirst"), { reply_markup: homeKeyboard(ctx.locale) });
+    return;
+  }
+  const mode = viewer.browseMode === "inbox" ? "inbox" : "feed";
+  const result = await applySwipe(ctx, viewer, target, action);
+  await continueAfterSwipe(ctx, mode, result);
+}
+
+export async function handleLikesOpen(ctx: OutsideContext): Promise<void> {
   if (ctx.callbackQuery) {
     try {
       await ctx.answerCallbackQuery();
@@ -147,7 +207,7 @@ export async function handleLikesOpen(ctx: FeedContext): Promise<void> {
   await replyNextIncomingLike(ctx);
 }
 
-export async function handleLikesAction(ctx: FeedContext): Promise<void> {
+export async function handleLikesAction(ctx: OutsideContext): Promise<void> {
   const data = ctx.callbackQuery?.data ?? "";
   const match = /^lk:(like|skip):(\d+)$/.exec(data);
   if (!match) return;
@@ -164,26 +224,30 @@ export async function handleLikesAction(ctx: FeedContext): Promise<void> {
     await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
     return;
   }
-  const action = match[1];
-  const toUser = Number(match[2]);
-  if (Number.isFinite(toUser) && toUser !== viewer.id) {
-    const inserted =
-      action === "like"
-        ? await insertLike(ctx.db, viewer.id, toUser)
-        : await insertSkip(ctx.db, viewer.id, toUser);
-    if (inserted) {
-      await insertEvent(ctx.db, viewer.id, action === "like" ? "like" : "skip");
-      if (action === "like") await processNewLike(ctx, viewer, toUser);
-    }
+  if (isPausedUser(viewer)) {
+    await replyPaused(ctx);
+    return;
   }
-  await replyNextIncomingLike(ctx);
+  const action = match[1] === "like" ? "like" : "skip";
+  const result = await applySwipe(ctx, viewer, Number(match[2]), action);
+  await continueAfterSwipe(ctx, "inbox", result);
 }
 
-export async function handleFeedCommand(ctx: FeedContext): Promise<void> {
+export async function handleFeedCommand(ctx: OutsideContext): Promise<void> {
+  if (!ctx.from) return;
+  const viewer = await getUser(ctx.db, ctx.from.id);
+  if (!viewer || isOnboarding(viewer)) {
+    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
+    return;
+  }
+  if (viewer.isActive !== 1) {
+    await resumeUser(ctx.db, viewer.id);
+    await flushPendingReveals(ctx);
+  }
   await replyNextFeedCard(ctx);
 }
 
-export async function handleFeedCallback(ctx: FeedContext): Promise<void> {
+export async function handleFeedCallback(ctx: OutsideContext): Promise<void> {
   const data = ctx.callbackQuery?.data ?? "";
   const match = /^fd:(like|skip):(\d+)$/.exec(data);
   if (!match) return;
@@ -200,21 +264,11 @@ export async function handleFeedCallback(ctx: FeedContext): Promise<void> {
     await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
     return;
   }
-
-  const action = match[1];
-  const toUser = Number(match[2]);
-  if (!Number.isFinite(toUser) || toUser === viewer.id) {
-    await replyNextFeedCard(ctx);
+  if (isPausedUser(viewer)) {
+    await replyPaused(ctx);
     return;
   }
-
-  const inserted =
-    action === "like"
-      ? await insertLike(ctx.db, viewer.id, toUser)
-      : await insertSkip(ctx.db, viewer.id, toUser);
-  if (inserted) {
-    await insertEvent(ctx.db, viewer.id, action === "like" ? "like" : "skip");
-    if (action === "like") await processNewLike(ctx, viewer, toUser);
-  }
-  await replyNextFeedCard(ctx);
+  const action = match[1] === "like" ? "like" : "skip";
+  const result = await applySwipe(ctx, viewer, Number(match[2]), action);
+  await continueAfterSwipe(ctx, "feed", result);
 }
