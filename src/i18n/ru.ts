@@ -21,6 +21,8 @@ export const ru: { [K in keyof typeof en]: string } = {
   onboardingGender: "Как себя обозначаешь? Это только на профиле, в мэтчинг не идёт.",
   onboardingGenderMale: "1. Мужской",
   onboardingGenderFemale: "2. Женский",
+  genderMale: "Мужской",
+  genderFemale: "Женский",
   onboardingGenderBad: "Нажми одну из кнопок.",
   onboardingBio: "Короткое био, по желанию. До 300 символов.",
   onboardingBioBad: "До 300 символов или нажми Пропустить.",

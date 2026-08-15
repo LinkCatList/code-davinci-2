@@ -19,6 +19,8 @@ export const en = {
   onboardingGender: "How do you identify? This is shown on your profile only. It is not used for matching.",
   onboardingGenderMale: "1. Male",
   onboardingGenderFemale: "2. Female",
+  genderMale: "Male",
+  genderFemale: "Female",
   onboardingGenderBad: "Tap one of the buttons.",
   onboardingBio: "A short bio, optional. Max 300 characters.",
   onboardingBioBad: "Keep it to 300 characters, or tap Skip.",

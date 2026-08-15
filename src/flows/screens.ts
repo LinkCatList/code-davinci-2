@@ -29,6 +29,8 @@ export function ownCardMessage(
       birthYear: user.birthYear ?? 0,
       bio: user.bio,
       city: user.city,
+      gender: user.gender,
+      locale,
       snippets,
       nowMs,
       includeAllSnippets: true,

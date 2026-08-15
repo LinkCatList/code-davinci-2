@@ -29,6 +29,7 @@ async function loadNextFeedCard(
   db: OutsideContext["db"],
   viewer: UserRecord,
   nowMs: number,
+  locale: OutsideContext["locale"],
 ): Promise<FeedCard | null> {
   let candidates = await listFeedCandidates(db, viewer);
   while (candidates.length > 0) {
@@ -43,6 +44,8 @@ async function loadNextFeedCard(
           birthYear: picked.user.birthYear,
           bio: picked.user.bio,
           city: picked.user.city,
+          gender: picked.user.gender,
+          locale,
           snippets,
           nowMs,
           distanceKm: picked.distanceKm,
@@ -71,6 +74,8 @@ async function loadNextIncomingCard(
         birthYear: liker.birthYear,
         bio: liker.bio,
         city: liker.city,
+        gender: liker.gender,
+        locale,
         snippets,
         nowMs,
         distanceKm: distanceBetween(viewer, liker),
@@ -110,7 +115,7 @@ export async function replyNextFeedCard(ctx: OutsideContext): Promise<void> {
     await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
     return;
   }
-  const card = await loadNextFeedCard(ctx.db, viewer, Date.now());
+  const card = await loadNextFeedCard(ctx.db, viewer, Date.now(), ctx.locale);
   if (!card) {
     await sendEmpty(ctx, "feedEmpty");
     return;
