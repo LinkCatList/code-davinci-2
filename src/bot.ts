@@ -26,7 +26,7 @@ import {
 import { flushPendingReveals, handleMatchesCommand } from "./flows/match";
 import { onboarding, type OutsideContext } from "./flows/onboarding";
 import { editProfile, handleProfileCallback, handleProfileCommand, startProfileEdit } from "./flows/profile";
-import { isPausedUser, parseBrowseMode, replyHome, replyPaused } from "./flows/screens";
+import { isPausedUser, parseBrowseMode, replyPaused, replyProfileScreen } from "./flows/screens";
 import {
   homeKeyboard,
   keyboardFor,
@@ -211,7 +211,7 @@ export function createBot(
         await replyPaused(ctx);
         return;
       }
-      await replyHome(ctx);
+      await replyProfileScreen(ctx);
       return;
     }
     if (ctx.conversation.active("onboarding") > 0) return;
@@ -221,6 +221,7 @@ export function createBot(
   bot.command("profile", handleProfileCommand);
   bot.callbackQuery(/^pf:(name|year|gender|bio|loc|snippets)$/, handleProfileCallback);
   bot.command("feed", handleFeedCommand);
+  bot.command("likes", replyNextIncomingLike);
   bot.command("matches", handleMatchesCommand);
   bot.callbackQuery(/^fd:(like|skip):\d+$/, handleFeedCallback);
   bot.callbackQuery(/^lk:open$/, handleLikesOpen);
@@ -244,7 +245,7 @@ export function createBot(
       return;
     }
     if (user) {
-      await replyHome(ctx);
+      await replyProfileScreen(ctx);
       return;
     }
     await ctx.reply(t(ctx.locale, "nothingToCancel"));

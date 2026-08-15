@@ -21,6 +21,7 @@ export const REMOVE_KEYBOARD = { remove_keyboard: true } as const;
 const CHROME_KEYS = [
   "menuBrowse",
   "menuProfile",
+  "menuHide",
   "menuLikes",
   "menuMatches",
   "swipeLike",
@@ -30,6 +31,8 @@ const CHROME_KEYS = [
   "profileSnippets",
   "profileBio",
   "profilePause",
+  "profileLikes",
+  "profileMatches",
   "onboardingLangRu",
   "onboardingLangEn",
   "onboardingGenderMale",
@@ -53,18 +56,14 @@ export function menuLegend(mode: "home" | "profile" | "paused", locale: Locale):
       t(locale, "profileRestart"),
       t(locale, "profileSnippets"),
       t(locale, "profileBio"),
-      t(locale, "profilePause"),
+      t(locale, "profileLikes"),
+      t(locale, "profileMatches"),
     ].join("\n");
   }
   if (mode === "paused") {
     return t(locale, "menuBrowse");
   }
-  return [
-    t(locale, "menuBrowse"),
-    t(locale, "menuProfile"),
-    t(locale, "menuLikes"),
-    t(locale, "menuMatches"),
-  ].join("\n");
+  return [t(locale, "menuBrowse"), t(locale, "menuProfile"), t(locale, "menuHide")].join("\n");
 }
 
 export function withMenuLegend(
@@ -76,7 +75,7 @@ export function withMenuLegend(
 }
 
 export function homeKeyboard(_locale?: Locale): Keyboard {
-  return persist(new Keyboard().text("1").text("2").text("3").text("4"));
+  return persist(new Keyboard().text("1").text("2").text("3"));
 }
 
 export function browseKeyboard(locale: Locale): Keyboard {
@@ -89,7 +88,7 @@ export function browseKeyboard(locale: Locale): Keyboard {
 }
 
 export function profileKeyboard(_locale?: Locale): Keyboard {
-  return persist(new Keyboard().text("1").text("2").text("3").text("4").text("5"));
+  return persist(new Keyboard().text("1").text("2").text("3").row().text("4").text("5").text("6"));
 }
 
 export function pausedKeyboard(_locale?: Locale): Keyboard {
@@ -163,16 +162,25 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
   return new Map<string, MenuAction>([
     [t(locale, "menuBrowse"), "browse"],
     [t(locale, "menuProfile"), "profile"],
+    [t(locale, "menuHide"), "pause"],
     [t(locale, "menuLikes"), "likes"],
     [t(locale, "menuMatches"), "matches"],
+    [t(locale, "profileLikes"), "likes"],
+    [t(locale, "profileMatches"), "matches"],
     ["1. Browse", "browse"],
     ["2. My card", "profile"],
+    ["3. Hide card", "pause"],
     ["3. Likes", "likes"],
     ["4. Matches", "matches"],
+    ["5. Likes", "likes"],
+    ["6. Matches", "matches"],
     ["1. Смотреть анкеты", "browse"],
     ["2. Моя анкета", "profile"],
+    ["3. Скрыть анкету", "pause"],
     ["3. Лайки", "likes"],
     ["4. Мэтчи", "matches"],
+    ["5. Лайки", "likes"],
+    ["6. Мэтчи", "matches"],
     ["🔍", "browse"],
     ["👤", "profile"],
     ["📭", "likes"],
@@ -222,10 +230,10 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
 }
 
 const DIGITS: Record<BrowseMode, Array<MenuAction | undefined>> = {
-  home: ["browse", "profile", "likes", "matches"],
+  home: ["browse", "profile", "pause"],
   feed: ["like", "skip", "sleep"],
   inbox: ["like", "skip", "sleep"],
-  profile: ["browse", "restart", "snippets", "bio", "pause"],
+  profile: ["browse", "restart", "snippets", "bio", "likes", "matches"],
   paused: ["browse"],
 };
 
@@ -237,7 +245,7 @@ export function matchMenuAction(
   const trimmed = text.trim();
   const exact = exactActionMap(locale).get(trimmed);
   if (exact) return exact;
-  if (/^[1-5]$/.test(trimmed)) {
+  if (/^[1-6]$/.test(trimmed)) {
     return DIGITS[screen][Number(trimmed) - 1] ?? null;
   }
   return null;
@@ -249,7 +257,7 @@ export function chromeLabels(locale: Locale): Set<string> {
 
 export function isReservedInput(text: string): boolean {
   const trimmed = text.trim();
-  if (/^[1-5]$/.test(trimmed)) return true;
+  if (/^[1-6]$/.test(trimmed)) return true;
   if (trimmed === "❤️" || trimmed === "👎" || trimmed === "💤") return true;
   if (trimmed === "🔍" || trimmed === "👤" || trimmed === "📭" || trimmed === "💬") return true;
   if (trimmed === "🔄" || trimmed === "💻" || trimmed === "✍️" || trimmed === "❌") return true;
@@ -296,6 +304,6 @@ export function matchSnippetMoreButton(text: string, locale: Locale): "add" | "d
 export function looksLikeOtherLocaleMenu(text: string, locale: Locale): boolean {
   const other: Locale = locale === "ru" ? "en" : "ru";
   const trimmed = text.trim();
-  if (/^[1-5]$/.test(trimmed)) return true;
+  if (/^[1-6]$/.test(trimmed)) return true;
   return chromeLabels(other).has(trimmed) && !chromeLabels(locale).has(trimmed);
 }

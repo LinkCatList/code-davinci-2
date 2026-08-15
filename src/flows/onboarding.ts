@@ -17,7 +17,6 @@ import {
   type UserRecord,
 } from "../db/queries";
 import {
-  homeKeyboard,
   isReservedInput,
   isSkipText,
   matchGenderButton,
@@ -36,7 +35,7 @@ import {
 import { detectSnippetLanguage, isSnippetLanguage, SNIPPET_LANGUAGES } from "../snippet-languages";
 import { t, type Locale } from "../t";
 import { renderOwnCard } from "./card";
-import { ownCardMessage } from "./screens";
+import { replyNextFeedCard } from "./feed";
 
 export type OutsideContext = ConversationFlavor<
   Context & {
@@ -652,20 +651,9 @@ export async function onboarding(conversation: OnboardingConversation, ctx: Cont
       await ctx.reply(t(locale, "onboardingUsernameWarn"));
     }
 
-    const nowMs = await conversation.now();
-    const home = await conversation.external(async (outer) => {
-      if (!outer.from) return null;
-      const viewer = await getUser(outer.db, outer.from.id);
-      if (!viewer || viewer.name === null || viewer.birthYear === null) return null;
-      const all = await listSnippets(outer.db, viewer.id);
-      await setBrowseState(outer.db, viewer.id, "home", null);
-      return ownCardMessage(viewer, all, nowMs, locale, "home");
+    await conversation.external(async (outer) => {
+      await replyNextFeedCard(outer);
     });
-    if (!home) {
-      await ctx.reply(t(locale, "onboardingMissingUser"));
-      return;
-    }
-    await ctx.reply(home.html, { parse_mode: "HTML", reply_markup: homeKeyboard(locale) });
     return;
   }
 }

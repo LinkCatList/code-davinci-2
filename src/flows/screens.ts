@@ -23,8 +23,7 @@ export function ownCardMessage(
   snippets: SnippetRecord[],
   nowMs: number,
   locale: Locale,
-  screen: "home" | "profile",
-): { html: string; keyboard: ReturnType<typeof homeKeyboard> } {
+): { html: string; keyboard: ReturnType<typeof profileKeyboard> } {
   return {
     html: renderOwnCard({
       name: user.name ?? "",
@@ -37,31 +36,28 @@ export function ownCardMessage(
       nowMs,
       includeAllSnippets: true,
       header: t(locale, "ownCardFrame"),
-      footer: menuLegend(screen, locale),
+      footer: menuLegend("profile", locale),
     }),
-    keyboard: screen === "profile" ? profileKeyboard(locale) : homeKeyboard(locale),
+    keyboard: profileKeyboard(locale),
   };
 }
 
-export async function replyOwnCard(
-  ctx: OutsideContext,
-  screen: "home" | "profile",
-): Promise<void> {
+export async function replyHome(ctx: OutsideContext): Promise<void> {
+  if (!ctx.from) return;
+  await setBrowseState(ctx.db, ctx.from.id, "home", null);
+  await ctx.reply(withMenuLegend(t(ctx.locale, "homeWait"), "home", ctx.locale), {
+    reply_markup: homeKeyboard(ctx.locale),
+  });
+}
+
+export async function replyProfileScreen(ctx: OutsideContext): Promise<void> {
   if (!ctx.from) return;
   const user = await getUser(ctx.db, ctx.from.id);
   if (!user || user.name === null || user.birthYear === null) return;
   const snippets = await listSnippets(ctx.db, user.id);
-  await setBrowseState(ctx.db, user.id, screen, null);
-  const { html, keyboard } = ownCardMessage(user, snippets, Date.now(), ctx.locale, screen);
+  await setBrowseState(ctx.db, user.id, "profile", null);
+  const { html, keyboard } = ownCardMessage(user, snippets, Date.now(), ctx.locale);
   await ctx.reply(html, { parse_mode: "HTML", reply_markup: keyboard });
-}
-
-export async function replyHome(ctx: OutsideContext): Promise<void> {
-  await replyOwnCard(ctx, "home");
-}
-
-export async function replyProfileScreen(ctx: OutsideContext): Promise<void> {
-  await replyOwnCard(ctx, "profile");
 }
 
 export async function replyPaused(ctx: OutsideContext): Promise<void> {

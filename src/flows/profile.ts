@@ -53,7 +53,7 @@ async function replyProfileFromConversation(
     return { user, snippets };
   });
   if (!data) return;
-  const { html, keyboard } = ownCardMessage(data.user, data.snippets, nowMs, locale, "profile");
+  const { html, keyboard } = ownCardMessage(data.user, data.snippets, nowMs, locale);
   await ctx.reply(html, { parse_mode: "HTML", reply_markup: keyboard });
 }
 

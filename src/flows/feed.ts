@@ -99,10 +99,7 @@ async function sendCard(
   });
 }
 
-async function sendEmpty(
-  ctx: OutsideContext,
-  key: "feedEmpty" | "likesEmpty",
-): Promise<void> {
+async function sendEmpty(ctx: OutsideContext, key: "likesEmpty"): Promise<void> {
   if (!ctx.from) return;
   await setBrowseState(ctx.db, ctx.from.id, "home", null);
   await ctx.reply(withMenuLegend(t(ctx.locale, key), "home", ctx.locale), {
@@ -119,7 +116,7 @@ export async function replyNextFeedCard(ctx: OutsideContext): Promise<void> {
   }
   const card = await loadNextFeedCard(ctx.db, viewer, Date.now(), ctx.locale);
   if (!card) {
-    await sendEmpty(ctx, "feedEmpty");
+    await replyHome(ctx);
     return;
   }
   await sendCard(ctx, card, "feed");
