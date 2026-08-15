@@ -85,8 +85,13 @@ async function editSnippets(
       return;
     }
     if (data === "pf:sadd") {
-      const content = await askSnippetText(conversation, next, locale, cancelText);
-      const language = await askSnippetLanguage(conversation, next, locale, cancelText);
+      const { content, language: detected } = await askSnippetText(
+        conversation,
+        next,
+        locale,
+        cancelText,
+      );
+      const language = detected ?? (await askSnippetLanguage(conversation, next, locale, cancelText));
       await saveSnippet(conversation, content, language, snippets.length);
       ctx = next;
       continue;

@@ -33,7 +33,7 @@ import {
   profileKeyboard,
   REMOVE_KEYBOARD,
 } from "../keyboards";
-import { isSnippetLanguage, SNIPPET_LANGUAGES } from "../snippet-languages";
+import { detectSnippetLanguage, isSnippetLanguage, SNIPPET_LANGUAGES } from "../snippet-languages";
 import { t, type Locale } from "../t";
 import { renderOwnCard } from "./card";
 import { ownCardMessage } from "./screens";
@@ -396,7 +396,7 @@ export async function askSnippetText(
   ctx: Context,
   locale: Locale,
   cancelText?: string,
-): Promise<string> {
+): Promise<{ content: string; language: string | null }> {
   const stop = cancelText ?? t(locale, "onboardingCancelled");
   const send = (target: Context) =>
     target.reply(t(locale, "onboardingSnippet"), { reply_markup: REMOVE_KEYBOARD });
@@ -407,14 +407,20 @@ export async function askSnippetText(
       await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
       continue;
     }
-    const text = next.message?.text;
+    const message = next.message;
+    const text = message?.text;
     if (text !== undefined) {
       if (isReservedInput(text)) {
         await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
         continue;
       }
       if (text.length >= 1 && text.length <= 1500) {
-        return text;
+        const detected = detectSnippetLanguage(text, message?.entities);
+        if (detected.content.length === 0) {
+          await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
+          continue;
+        }
+        return detected;
       }
     }
     await next.reply(t(locale, "onboardingSnippetBad"), { reply_markup: REMOVE_KEYBOARD });
@@ -503,8 +509,8 @@ async function askMoreSnippets(
       });
     }
     if (!add) return;
-    const content = await askSnippetText(conversation, ctx, locale);
-    const language = await askSnippetLanguage(conversation, ctx, locale);
+    const { content, language: detected } = await askSnippetText(conversation, ctx, locale);
+    const language = detected ?? (await askSnippetLanguage(conversation, ctx, locale));
     await saveSnippet(conversation, content, language, count);
     count += 1;
   }
@@ -611,8 +617,8 @@ export async function onboarding(conversation: OnboardingConversation, ctx: Cont
     if (step === "onboarding:snippets") {
       let snippets = await loadSnippets(conversation);
       if (snippets.length === 0) {
-        const content = await askSnippetText(conversation, ctx, locale);
-        const language = await askSnippetLanguage(conversation, ctx, locale);
+        const { content, language: detected } = await askSnippetText(conversation, ctx, locale);
+        const language = detected ?? (await askSnippetLanguage(conversation, ctx, locale));
         await saveSnippet(conversation, content, language, 0);
         snippets = await loadSnippets(conversation);
       }
