@@ -13,7 +13,7 @@ import {
   type UserRecord,
 } from "../db/queries";
 import { distanceBetween } from "../geo";
-import { browseKeyboard, homeKeyboard } from "../keyboards";
+import { browseKeyboard, homeKeyboard, withMenuLegend } from "../keyboards";
 import { t } from "../t";
 import { renderOwnCard } from "./card";
 import { flushPendingReveals, processNewLike } from "./match";
@@ -105,7 +105,9 @@ async function sendEmpty(
 ): Promise<void> {
   if (!ctx.from) return;
   await setBrowseState(ctx.db, ctx.from.id, "home", null);
-  await ctx.reply(t(ctx.locale, key), { reply_markup: homeKeyboard(ctx.locale) });
+  await ctx.reply(withMenuLegend(t(ctx.locale, key), "home", ctx.locale), {
+    reply_markup: homeKeyboard(ctx.locale),
+  });
 }
 
 export async function replyNextFeedCard(ctx: OutsideContext): Promise<void> {
@@ -193,7 +195,9 @@ export async function handleBrowseAction(
   const target = viewer.lastCardUserId;
   if (target == null) {
     await setBrowseState(ctx.db, viewer.id, "home", null);
-    await ctx.reply(t(ctx.locale, "openCardsFirst"), { reply_markup: homeKeyboard(ctx.locale) });
+    await ctx.reply(withMenuLegend(t(ctx.locale, "openCardsFirst"), "home", ctx.locale), {
+      reply_markup: homeKeyboard(ctx.locale),
+    });
     return;
   }
   const mode = viewer.browseMode === "inbox" ? "inbox" : "feed";

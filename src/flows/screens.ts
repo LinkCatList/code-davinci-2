@@ -8,9 +8,11 @@ import {
 } from "../db/queries";
 import {
   homeKeyboard,
+  menuLegend,
   parseBrowseMode,
   pausedKeyboard,
   profileKeyboard,
+  withMenuLegend,
 } from "../keyboards";
 import { t, type Locale } from "../t";
 import { renderOwnCard } from "./card";
@@ -35,6 +37,7 @@ export function ownCardMessage(
       nowMs,
       includeAllSnippets: true,
       header: t(locale, "ownCardFrame"),
+      footer: menuLegend(screen, locale),
     }),
     keyboard: screen === "profile" ? profileKeyboard(locale) : homeKeyboard(locale),
   };
@@ -64,7 +67,9 @@ export async function replyProfileScreen(ctx: OutsideContext): Promise<void> {
 export async function replyPaused(ctx: OutsideContext): Promise<void> {
   if (!ctx.from) return;
   await setBrowseState(ctx.db, ctx.from.id, "paused", null);
-  await ctx.reply(t(ctx.locale, "pausedHint"), { reply_markup: pausedKeyboard(ctx.locale) });
+  await ctx.reply(withMenuLegend(t(ctx.locale, "pausedHint"), "paused", ctx.locale), {
+    reply_markup: pausedKeyboard(ctx.locale),
+  });
 }
 
 export function isPausedUser(user: UserRecord): boolean {

@@ -33,6 +33,7 @@ import {
   looksLikeOtherLocaleMenu,
   matchMenuAction,
   type MenuAction,
+  withMenuLegend,
 } from "./keyboards";
 import { t } from "./t";
 
@@ -52,7 +53,9 @@ async function replyStub(ctx: BotContext): Promise<void> {
     return;
   }
   await setBrowseState(ctx.db, ctx.from.id, "home", null);
-  await ctx.reply(t(ctx.locale, "comingSoon"), { reply_markup: homeKeyboard(ctx.locale) });
+  await ctx.reply(withMenuLegend(t(ctx.locale, "comingSoon"), "home", ctx.locale), {
+    reply_markup: homeKeyboard(ctx.locale),
+  });
 }
 
 async function restartProfile(ctx: BotContext): Promise<void> {
@@ -143,7 +146,11 @@ async function handleMenuText(ctx: BotContext): Promise<void> {
   const action = matchMenuAction(text, ctx.locale, screen);
   if (!action) {
     if (looksLikeOtherLocaleMenu(text, ctx.locale)) {
-      await ctx.reply(t(ctx.locale, "useMenu"), { reply_markup: keyboardFor(screen, ctx.locale) });
+      const hint =
+        screen === "feed" || screen === "inbox"
+          ? t(ctx.locale, "useMenu")
+          : withMenuLegend(t(ctx.locale, "useMenu"), screen, ctx.locale);
+      await ctx.reply(hint, { reply_markup: keyboardFor(screen, ctx.locale) });
     }
     return;
   }

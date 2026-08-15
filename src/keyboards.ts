@@ -46,14 +46,37 @@ function persist(keyboard: Keyboard): Keyboard {
   return keyboard.resized().persistent();
 }
 
-export function homeKeyboard(locale: Locale): Keyboard {
-  return persist(
-    new Keyboard()
-      .text(t(locale, "menuBrowse"))
-      .text(t(locale, "menuProfile"))
-      .text(t(locale, "menuLikes"))
-      .text(t(locale, "menuMatches")),
-  );
+export function menuLegend(mode: "home" | "profile" | "paused", locale: Locale): string {
+  if (mode === "profile") {
+    return [
+      t(locale, "menuBrowse"),
+      t(locale, "profileRestart"),
+      t(locale, "profileSnippets"),
+      t(locale, "profileBio"),
+      t(locale, "profilePause"),
+    ].join("\n");
+  }
+  if (mode === "paused") {
+    return t(locale, "menuBrowse");
+  }
+  return [
+    t(locale, "menuBrowse"),
+    t(locale, "menuProfile"),
+    t(locale, "menuLikes"),
+    t(locale, "menuMatches"),
+  ].join("\n");
+}
+
+export function withMenuLegend(
+  text: string,
+  mode: "home" | "profile" | "paused",
+  locale: Locale,
+): string {
+  return `${text}\n\n${menuLegend(mode, locale)}`;
+}
+
+export function homeKeyboard(_locale?: Locale): Keyboard {
+  return persist(new Keyboard().text("1").text("2").text("3").text("4"));
 }
 
 export function browseKeyboard(locale: Locale): Keyboard {
@@ -65,23 +88,12 @@ export function browseKeyboard(locale: Locale): Keyboard {
   );
 }
 
-export function profileKeyboard(locale: Locale): Keyboard {
-  return persist(
-    new Keyboard()
-      .text(t(locale, "menuBrowse"))
-      .row()
-      .text(t(locale, "profileRestart"))
-      .row()
-      .text(t(locale, "profileSnippets"))
-      .row()
-      .text(t(locale, "profileBio"))
-      .row()
-      .text(t(locale, "profilePause")),
-  );
+export function profileKeyboard(_locale?: Locale): Keyboard {
+  return persist(new Keyboard().text("1").text("2").text("3").text("4").text("5"));
 }
 
-export function pausedKeyboard(locale: Locale): Keyboard {
-  return persist(new Keyboard().text(t(locale, "menuBrowse")));
+export function pausedKeyboard(_locale?: Locale): Keyboard {
+  return persist(new Keyboard().text("1"));
 }
 
 export function keyboardFor(mode: BrowseMode, locale: Locale): Keyboard {
@@ -153,6 +165,26 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
     [t(locale, "menuProfile"), "profile"],
     [t(locale, "menuLikes"), "likes"],
     [t(locale, "menuMatches"), "matches"],
+    ["1. Browse", "browse"],
+    ["2. My card", "profile"],
+    ["3. Likes", "likes"],
+    ["4. Matches", "matches"],
+    ["1. Смотреть анкеты", "browse"],
+    ["2. Моя анкета", "profile"],
+    ["3. Лайки", "likes"],
+    ["4. Мэтчи", "matches"],
+    ["🔍", "browse"],
+    ["👤", "profile"],
+    ["📭", "likes"],
+    ["💬", "matches"],
+    ["🔍 Browse", "browse"],
+    ["👤 My card", "profile"],
+    ["📭 Likes", "likes"],
+    ["💬 Matches", "matches"],
+    ["🔍 Смотреть анкеты", "browse"],
+    ["👤 Моя анкета", "profile"],
+    ["📭 Лайки", "likes"],
+    ["💬 Мэтчи", "matches"],
     [t(locale, "swipeLike"), "like"],
     [t(locale, "swipeSkip"), "skip"],
     [t(locale, "swipeSleep"), "sleep"],
@@ -160,6 +192,26 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
     [t(locale, "profileSnippets"), "snippets"],
     [t(locale, "profileBio"), "bio"],
     [t(locale, "profilePause"), "pause"],
+    ["2. Start over", "restart"],
+    ["3. Snippets", "snippets"],
+    ["4. Text", "bio"],
+    ["5. Hide card", "pause"],
+    ["2. Заполнить заново", "restart"],
+    ["3. Сниппеты", "snippets"],
+    ["4. Текст", "bio"],
+    ["5. Скрыть анкету", "pause"],
+    ["🔄", "restart"],
+    ["💻", "snippets"],
+    ["✍️", "bio"],
+    ["❌", "pause"],
+    ["🔄 Start over", "restart"],
+    ["💻 Snippets", "snippets"],
+    ["✍️ Text", "bio"],
+    ["❌ Hide card", "pause"],
+    ["🔄 Заполнить заново", "restart"],
+    ["💻 Сниппеты", "snippets"],
+    ["✍️ Текст", "bio"],
+    ["❌ Скрыть анкету", "pause"],
     ["❤️", "like"],
     ["👎", "skip"],
     ["💤", "sleep"],
@@ -199,6 +251,8 @@ export function isReservedInput(text: string): boolean {
   const trimmed = text.trim();
   if (/^[1-5]$/.test(trimmed)) return true;
   if (trimmed === "❤️" || trimmed === "👎" || trimmed === "💤") return true;
+  if (trimmed === "🔍" || trimmed === "👤" || trimmed === "📭" || trimmed === "💬") return true;
+  if (trimmed === "🔄" || trimmed === "💻" || trimmed === "✍️" || trimmed === "❌") return true;
   return chromeLabels("ru").has(trimmed) || chromeLabels("en").has(trimmed);
 }
 

@@ -14,7 +14,7 @@ import {
   setMatchRevealed,
   setUserInactive,
 } from "../db/queries";
-import { homeKeyboard } from "../keyboards";
+import { homeKeyboard, withMenuLegend } from "../keyboards";
 import { ageFromBirthYear, escapeHtml } from "./card";
 import { isPausedUser, replyPaused } from "./screens";
 import { isLocale, t, type Locale } from "../t";
@@ -60,7 +60,7 @@ async function sendReveal(
 ): Promise<boolean> {
   if (to.isActive !== 1 || !other.username) return false;
   const locale = localeOf(to);
-  const html = matchText(to, other, nowMs);
+  const html = withMenuLegend(matchText(to, other, nowMs), "home", locale);
   return safeSend(api, db, to.id, () =>
     api.sendMessage(to.id, html, {
       parse_mode: "HTML",
@@ -93,7 +93,9 @@ async function sendPending(
   if (to.isActive !== 1) return;
   const locale = localeOf(to);
   await safeSend(api, db, to.id, () =>
-    api.sendMessage(to.id, t(locale, key), { reply_markup: homeKeyboard(locale) }),
+    api.sendMessage(to.id, withMenuLegend(t(locale, key), "home", locale), {
+      reply_markup: homeKeyboard(locale),
+    }),
   );
 }
 
@@ -164,7 +166,9 @@ export async function handleMatchesCommand(ctx: OutsideContext): Promise<void> {
   await setBrowseState(ctx.db, me.id, "home", null);
   const pairs = await listMatchesForUser(ctx.db, me.id);
   if (pairs.length === 0) {
-    await ctx.reply(t(ctx.locale, "matchesEmpty"), { reply_markup: homeKeyboard(ctx.locale) });
+    await ctx.reply(withMenuLegend(t(ctx.locale, "matchesEmpty"), "home", ctx.locale), {
+      reply_markup: homeKeyboard(ctx.locale),
+    });
     return;
   }
   const nowMs = Date.now();
@@ -181,5 +185,7 @@ export async function handleMatchesCommand(ctx: OutsideContext): Promise<void> {
   }
   let text = lines.join("\n");
   if (text.length > 4000) text = `${text.slice(0, 3990)}\n…`;
-  await ctx.reply(text, { reply_markup: homeKeyboard(ctx.locale) });
+  await ctx.reply(withMenuLegend(text, "home", ctx.locale), {
+    reply_markup: homeKeyboard(ctx.locale),
+  });
 }
