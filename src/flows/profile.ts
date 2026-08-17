@@ -1,5 +1,5 @@
-import { InlineKeyboard, type Context } from "grammy";
-import { deleteSnippet, getUser, isOnboarding, listSnippets, setBrowseState } from "../db/queries";
+import { type Context } from "grammy";
+import { getUser, isOnboarding, listSnippets, setBrowseState } from "../db/queries";
 import { t, type Locale } from "../t";
 import {
   askBio,
@@ -10,9 +10,7 @@ import {
   askSnippetText,
   askYear,
   type BotConversation,
-  loadSnippets,
   saveSnippet,
-  waitUpdate,
   type OutsideContext,
 } from "./onboarding";
 import { ownCardMessage, isPausedUser, replyPaused, replyProfileScreen } from "./screens";
@@ -63,53 +61,9 @@ async function editSnippets(
   locale: Locale,
   cancelText: string,
 ): Promise<void> {
-  for (;;) {
-    const snippets = await loadSnippets(conversation);
-    const keyboard = new InlineKeyboard();
-    for (const [index, snippet] of snippets.entries()) {
-      keyboard.text(`${index + 1}. ${snippet.language}`, `pf:sdel:${snippet.id}`).row();
-    }
-    if (snippets.length < 3) {
-      keyboard.text(t(locale, "onboardingSnippetAdd"), "pf:sadd").row();
-    }
-    keyboard.text(t(locale, "editSnippetDone"), "pf:sdone");
-
-    const send = (target: Context) =>
-      target.reply(t(locale, "editSnippetsTitle"), { reply_markup: keyboard });
-    await send(ctx);
-
-    const next = await waitUpdate(conversation, send, cancelText);
-    const data = next.callbackQuery?.data;
-    if (data === "pf:sdone") {
-      ctx = next;
-      return;
-    }
-    if (data === "pf:sadd") {
-      const { content, language: detected } = await askSnippetText(
-        conversation,
-        next,
-        locale,
-        cancelText,
-      );
-      const language = detected ?? (await askSnippetLanguage(conversation, next, locale, cancelText));
-      await saveSnippet(conversation, content, language, snippets.length);
-      ctx = next;
-      continue;
-    }
-    if (data?.startsWith("pf:sdel:")) {
-      const id = Number(data.slice("pf:sdel:".length));
-      const result = await conversation.external(async (outer) => {
-        if (!outer.from) return "missing" as const;
-        return deleteSnippet(outer.db, outer.from.id, id);
-      });
-      if (result === "last") {
-        await next.reply(t(locale, "editSnippetLast"));
-      }
-      ctx = next;
-      continue;
-    }
-    ctx = next;
-  }
+  const { content, language: detected } = await askSnippetText(conversation, ctx, locale, cancelText);
+  const language = detected ?? (await askSnippetLanguage(conversation, ctx, locale, cancelText));
+  await saveSnippet(conversation, content, language);
 }
 
 export async function editProfile(

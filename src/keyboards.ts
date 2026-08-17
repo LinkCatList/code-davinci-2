@@ -17,6 +17,7 @@ export type MenuAction =
   | "pause";
 
 export const REMOVE_KEYBOARD = { remove_keyboard: true } as const;
+export const MENU_BROWSE_BUTTON = "1 🚀";
 
 const CHROME_KEYS = [
   "menuBrowse",
@@ -39,8 +40,6 @@ const CHROME_KEYS = [
   "onboardingGenderFemale",
   "onboardingSkip",
   "onboardingShareLocation",
-  "onboardingSnippetAdd",
-  "onboardingSnippetDone",
   "onboardingConfirm",
   "onboardingStartOver",
 ] as const;
@@ -75,7 +74,7 @@ export function withMenuLegend(
 }
 
 export function homeKeyboard(_locale?: Locale): Keyboard {
-  return persist(new Keyboard().text("1").text("2").text("3"));
+  return persist(new Keyboard().text(MENU_BROWSE_BUTTON).text("2").text("3"));
 }
 
 export function browseKeyboard(locale: Locale): Keyboard {
@@ -88,11 +87,13 @@ export function browseKeyboard(locale: Locale): Keyboard {
 }
 
 export function profileKeyboard(_locale?: Locale): Keyboard {
-  return persist(new Keyboard().text("1").text("2").text("3").row().text("4").text("5").text("6"));
+  return persist(
+    new Keyboard().text(MENU_BROWSE_BUTTON).text("2").text("3").row().text("4").text("5").text("6"),
+  );
 }
 
 export function pausedKeyboard(_locale?: Locale): Keyboard {
-  return persist(new Keyboard().text("1"));
+  return persist(new Keyboard().text(MENU_BROWSE_BUTTON));
 }
 
 export function keyboardFor(mode: BrowseMode, locale: Locale): Keyboard {
@@ -135,14 +136,6 @@ export function onboardingLocationKeyboard(locale: Locale): Keyboard {
     .resized();
 }
 
-export function onboardingMoreKeyboard(locale: Locale): Keyboard {
-  return new Keyboard()
-    .text(t(locale, "onboardingSnippetAdd"))
-    .row()
-    .text(t(locale, "onboardingSnippetDone"))
-    .resized();
-}
-
 export function onboardingPreviewKeyboard(locale: Locale): Keyboard {
   return new Keyboard()
     .text(t(locale, "onboardingConfirm"))
@@ -167,6 +160,7 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
     [t(locale, "menuMatches"), "matches"],
     [t(locale, "profileLikes"), "likes"],
     [t(locale, "profileMatches"), "matches"],
+    [MENU_BROWSE_BUTTON, "browse"],
     ["1. Browse", "browse"],
     ["2. My card", "profile"],
     ["3. Hide card", "pause"],
@@ -257,7 +251,7 @@ export function chromeLabels(locale: Locale): Set<string> {
 
 export function isReservedInput(text: string): boolean {
   const trimmed = text.trim();
-  if (/^[1-6]$/.test(trimmed)) return true;
+  if (trimmed === MENU_BROWSE_BUTTON || /^[1-6]$/.test(trimmed)) return true;
   if (trimmed === "❤️" || trimmed === "👎" || trimmed === "💤") return true;
   if (trimmed === "🔍" || trimmed === "👤" || trimmed === "📭" || trimmed === "💬") return true;
   if (trimmed === "🔄" || trimmed === "💻" || trimmed === "✍️" || trimmed === "❌") return true;
@@ -291,13 +285,6 @@ export function matchPreviewButton(text: string, locale: Locale): "ok" | "reset"
   const trimmed = text.trim();
   if (trimmed === t(locale, "onboardingConfirm") || trimmed === "1") return "ok";
   if (trimmed === t(locale, "onboardingStartOver") || trimmed === "2") return "reset";
-  return null;
-}
-
-export function matchSnippetMoreButton(text: string, locale: Locale): "add" | "done" | null {
-  const trimmed = text.trim();
-  if (trimmed === t(locale, "onboardingSnippetAdd") || trimmed === "1") return "add";
-  if (trimmed === t(locale, "onboardingSnippetDone") || trimmed === "2") return "done";
   return null;
 }
 

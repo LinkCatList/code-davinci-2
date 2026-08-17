@@ -23,13 +23,17 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at").notNull(),
 });
 
-export const snippets = sqliteTable("snippets", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull(),
-  language: text("language").notNull(),
-  content: text("content").notNull(),
-  position: integer("position").notNull(),
-});
+export const snippets = sqliteTable(
+  "snippets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull(),
+    language: text("language").notNull(),
+    content: text("content").notNull(),
+    position: integer("position").notNull(),
+  },
+  (table) => [uniqueIndex("snippets_user_id_unique").on(table.userId)],
+);
 
 export const likes = sqliteTable(
   "likes",

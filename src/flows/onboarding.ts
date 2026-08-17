@@ -8,11 +8,11 @@ import {
   completeProfile,
   getUser,
   insertEventOnce,
-  insertSnippet,
   isOnboarding,
   listSnippets,
   patchUser,
   setBrowseState,
+  upsertSnippet,
   type SnippetRecord,
   type UserRecord,
 } from "../db/queries";
@@ -22,11 +22,9 @@ import {
   matchGenderButton,
   matchLangButton,
   matchPreviewButton,
-  matchSnippetMoreButton,
   onboardingGenderKeyboard,
   onboardingLangKeyboard,
   onboardingLocationKeyboard,
-  onboardingMoreKeyboard,
   onboardingPreviewKeyboard,
   onboardingSkipKeyboard,
   profileKeyboard,
@@ -456,63 +454,15 @@ export async function saveSnippet(
   conversation: OnboardingConversation,
   content: string,
   language: string,
-  position: number,
 ): Promise<void> {
   await conversation.external(async (outer) => {
     if (!outer.from) return;
-    await insertSnippet(outer.db, {
+    await upsertSnippet(outer.db, {
       userId: outer.from.id,
       language,
       content,
-      position,
     });
   });
-}
-
-async function askMoreSnippets(
-  conversation: OnboardingConversation,
-  ctx: Context,
-  locale: Locale,
-  startCount: number,
-): Promise<void> {
-  let count = startCount;
-  while (count < 3) {
-    const send = (target: Context) =>
-      target.reply(t(locale, "onboardingSnippetMore"), {
-        reply_markup: onboardingMoreKeyboard(locale),
-      });
-    await send(ctx);
-    let add = false;
-    for (;;) {
-      const next = await waitUpdate(conversation, send, t(locale, "onboardingCancelled"));
-      const data = next.callbackQuery?.data;
-      if (data === "ob:snip:done") {
-        await dropMarkup(next);
-        return;
-      }
-      if (data === "ob:snip:more") {
-        await dropMarkup(next);
-        add = true;
-        ctx = next;
-        break;
-      }
-      const fromText = next.message?.text ? matchSnippetMoreButton(next.message.text, locale) : null;
-      if (fromText === "done") return;
-      if (fromText === "add") {
-        add = true;
-        ctx = next;
-        break;
-      }
-      await next.reply(t(locale, "onboardingSnippetMore"), {
-        reply_markup: onboardingMoreKeyboard(locale),
-      });
-    }
-    if (!add) return;
-    const { content, language: detected } = await askSnippetText(conversation, ctx, locale);
-    const language = detected ?? (await askSnippetLanguage(conversation, ctx, locale));
-    await saveSnippet(conversation, content, language, count);
-    count += 1;
-  }
 }
 
 async function askPreview(
@@ -616,15 +566,11 @@ export async function onboarding(conversation: OnboardingConversation, ctx: Cont
     }
 
     if (step === "onboarding:snippets") {
-      let snippets = await loadSnippets(conversation);
+      const snippets = await loadSnippets(conversation);
       if (snippets.length === 0) {
         const { content, language: detected } = await askSnippetText(conversation, ctx, locale);
         const language = detected ?? (await askSnippetLanguage(conversation, ctx, locale));
-        await saveSnippet(conversation, content, language, 0);
-        snippets = await loadSnippets(conversation);
-      }
-      if (snippets.length < 3) {
-        await askMoreSnippets(conversation, ctx, locale, snippets.length);
+        await saveSnippet(conversation, content, language);
       }
       await setStep(conversation, "onboarding:preview");
       step = "onboarding:preview";

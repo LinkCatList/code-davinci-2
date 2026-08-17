@@ -70,11 +70,12 @@ export async function listSnippets(db: Db, userId: number): Promise<SnippetRecor
     .all();
 }
 
-export async function insertSnippet(
+export async function upsertSnippet(
   db: Db,
-  values: { userId: number; language: string; content: string; position: number },
+  values: { userId: number; language: string; content: string },
 ): Promise<void> {
-  await db.insert(snippets).values(values);
+  await db.delete(snippets).where(eq(snippets.userId, values.userId));
+  await db.insert(snippets).values({ ...values, position: 0 });
 }
 
 export async function clearOnboardingFields(db: Db, userId: number): Promise<void> {
@@ -223,27 +224,6 @@ export async function listFeedCandidates(db: Db, viewer: UserRecord): Promise<Us
     }
   }
   return withLang;
-}
-
-export async function deleteSnippet(
-  db: Db,
-  userId: number,
-  snippetId: number,
-): Promise<"ok" | "last" | "missing"> {
-  const all = await listSnippets(db, userId);
-  if (all.length <= 1) return "last";
-  const target = all.find((row) => row.id === snippetId);
-  if (!target) return "missing";
-  await db
-    .delete(snippets)
-    .where(and(eq(snippets.id, snippetId), eq(snippets.userId, userId)));
-  const remaining = await listSnippets(db, userId);
-  for (const [index, row] of remaining.entries()) {
-    if (row.position !== index) {
-      await db.update(snippets).set({ position: index }).where(eq(snippets.id, row.id));
-    }
-  }
-  return "ok";
 }
 
 export async function hasReciprocalLike(
