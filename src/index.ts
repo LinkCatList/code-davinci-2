@@ -8,6 +8,10 @@ let cachedBotInfo: UserFromGetMe | undefined;
 export default {
   async fetch(request: Request, env: Env, executionCtx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname === "/health") {
+      return new Response("ok");
+    }
+
     if (url.pathname !== `/webhook/${env.WEBHOOK_SECRET}`) {
       return new Response("Not found", { status: 404 });
     }
