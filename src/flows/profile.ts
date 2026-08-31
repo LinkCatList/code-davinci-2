@@ -4,7 +4,6 @@ import { t, type Locale } from "../t";
 import {
   askBio,
   askGender,
-  askLocation,
   askName,
   askSnippetLanguage,
   askSnippetText,
@@ -15,7 +14,7 @@ import {
 } from "./onboarding";
 import { ownCardMessage, isPausedUser, replyPaused, replyProfileScreen } from "./screens";
 
-const EDIT_FIELDS = ["name", "year", "gender", "bio", "loc", "snippets"] as const;
+const EDIT_FIELDS = ["name", "year", "gender", "bio", "snippets"] as const;
 type EditField = (typeof EDIT_FIELDS)[number];
 
 function isEditField(value: string): value is EditField {
@@ -90,9 +89,6 @@ export async function editProfile(
       break;
     case "bio":
       await askBio(conversation, ctx, locale, cancelText);
-      break;
-    case "loc":
-      await askLocation(conversation, ctx, locale, cancelText);
       break;
     case "snippets":
       await editSnippets(conversation, ctx, locale, cancelText);

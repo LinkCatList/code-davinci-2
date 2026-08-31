@@ -1,6 +1,5 @@
 import { and, asc, eq, gt, isNull, lt, or } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
-import { distanceBetween } from "../geo";
 import { now } from "../now";
 import { localeFromTelegram, type Locale } from "../t";
 import * as schema from "./schema";
@@ -86,9 +85,6 @@ export async function clearOnboardingFields(db: Db, userId: number): Promise<voi
       birthYear: null,
       gender: null,
       bio: null,
-      city: null,
-      lat: null,
-      lng: null,
       state: "onboarding:name",
       lastCardUserId: null,
       browseMode: null,
@@ -178,28 +174,11 @@ export async function listSwipedIds(db: Db, fromUser: number): Promise<Set<numbe
   return new Set([...liked.map((row) => row.toUser), ...skipped.map((row) => row.toUser)]);
 }
 
-export function pickCandidate(
-  viewer: UserRecord,
-  candidates: UserRecord[],
-): { user: UserRecord; distanceKm: number | null } | null {
-  const viewerHasCoords = viewer.lat != null && viewer.lng != null;
-  const maxDist = viewer.maxDistKm;
-  const ranked: { user: UserRecord; distanceKm: number | null }[] = [];
-
-  for (const candidate of candidates) {
-    const distanceKm = distanceBetween(viewer, candidate);
-    if (viewerHasCoords && maxDist != null && (distanceKm == null || distanceKm > maxDist)) {
-      continue;
-    }
-    ranked.push({ user: candidate, distanceKm });
-  }
-
+export function pickCandidate(candidates: UserRecord[]): UserRecord | null {
+  const ranked = [...candidates];
   ranked.sort((a, b) => {
-    if (a.user.isFake !== b.user.isFake) return a.user.isFake - b.user.isFake;
-    if (a.distanceKm != null && b.distanceKm != null) return a.distanceKm - b.distanceKm;
-    if (a.distanceKm != null) return -1;
-    if (b.distanceKm != null) return 1;
-    return b.user.lastActiveAt - a.user.lastActiveAt;
+    if (a.isFake !== b.isFake) return a.isFake - b.isFake;
+    return b.lastActiveAt - a.lastActiveAt;
   });
 
   return ranked[0] ?? null;

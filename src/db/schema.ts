@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey(),
@@ -9,10 +9,6 @@ export const users = sqliteTable("users", {
   birthYear: integer("birth_year"),
   gender: integer("gender"),
   bio: text("bio"),
-  city: text("city"),
-  lat: real("lat"),
-  lng: real("lng"),
-  maxDistKm: integer("max_dist_km"),
   langFilter: text("lang_filter"),
   isActive: integer("is_active").notNull().default(1),
   isFake: integer("is_fake").notNull().default(0),

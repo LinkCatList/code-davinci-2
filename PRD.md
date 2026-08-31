@@ -10,7 +10,7 @@
 
 A Telegram bot where programmers meet other programmers by **swiping on code, not faces**. Inspired by [VSinder](https://github.com/benawad/vsinder) (a dating app inside VS Code), but rebuilt as a Telegram bot and positioned as **developer networking first** — dating, friendship, and collaboration are implicit outcomes, not separate modes.
 
-The core hook: a candidate card is a **code snippet** with minimal info (name, stack, city/distance, bio). The photo and full profile are revealed **only after a mutual like**. On match, the bot exchanges the parties' Telegram @usernames — there is no in-bot chat.
+The core hook: a candidate card is a **code snippet** with minimal info (name, stack, bio). The photo and full profile are revealed **only after a mutual like**. On match, the bot exchanges the parties' Telegram @usernames — there is no in-bot chat.
 
 ## 2. Background & Context
 
@@ -53,8 +53,7 @@ Explicitly **out of scope** for MVP:
 
 - **Who:** programmers (students to seniors) who hang out in Telegram dev communities.
 - **Languages at launch:** Russian + English (bot UI fully i18n'd; default from user's Telegram locale, switchable via `/language`).
-- **Geography:** global; geolocation matching works where users share location, city-based otherwise.
-- **Positioning:** "Find devs worth knowing by reading their code." Networking-first; dating is an implicit, welcome side effect — hence **no dating filters and no dating framing in copy**. Matching signals are code, stack, and location — gender is not one of them.
+- **Positioning:** "Find devs worth knowing by reading their code." Networking-first; dating is an implicit, welcome side effect — hence **no dating filters and no dating framing in copy**. Matching signals are code and stack — gender is not one of them.
 
 ## 6. Core User Flows
 
@@ -67,10 +66,9 @@ Multi-step conversation (state persisted in D1 — see §9, `users.state`):
 3. Birth year (validate 18+; reject otherwise — this is the only hard safety gate in MVP).
 4. Gender (**required**, binary: male / female; display-only, never used in matching or filters).
 5. Bio (optional, ≤ 300 chars).
-6. Location: share Telegram location (lat/lng stored) **or** type city name manually (fallback for desktop users). Skippable → user appears in global feed only.
-7. Photo: exactly 1 (stored as Telegram `file_id`; **never shown in feed**, revealed on match).
-8. Code snippet: paste code in a message (≤ 1500 chars), then pick language from a fixed inline-keyboard list (reuse v1's enum: Rust, C++, Java, Python, JS, TS, C#, Go, Swift, Kotlin, Ruby, PHP, etc.). Minimum 1, up to 3 in MVP.
-9. Profile preview → confirm → enter feed.
+6. Photo: exactly 1 (stored as Telegram `file_id`; **never shown in feed**, revealed on match).
+7. Code snippet: paste code in a message (≤ 1500 chars), then pick language from a fixed inline-keyboard list (reuse v1's enum: Rust, C++, Java, Python, JS, TS, C#, Go, Swift, Kotlin, Ruby, PHP, etc.). Minimum 1, up to 3 in MVP.
+8. Profile preview → confirm → enter feed.
 
 If the user has **no @username**, warn during onboarding: "Matches are shared via @username. Set one in Telegram settings, otherwise matches can't be revealed." (Not a blocker — handled at match time, see §6.4.)
 
@@ -79,11 +77,11 @@ If the user has **no @username**, warn during onboarding: "Matches are shared vi
 - `/feed` (or after onboarding) shows candidate cards one at a time.
 - **Card contents** (single message):
   - Code snippet rendered as a monospace code block (use HTML parse mode with `<pre>` to avoid MarkdownV2 escaping hell)
-  - Name, age, snippet language + user's other languages, distance (if computable) or city, bio
+  - Name, age, snippet language + user's other languages, bio
   - **No photo.**
 - Inline keyboard: `👍 Like` / `👎 Skip`.
-- **Candidate selection:** not self, not already swiped (like or skip), active (not paused/deleted); ordered by distance (if both have coords) then `last_active_at DESC`. When real unseen candidates run out → backfill with seed profiles (§6.6).
-- **Filters** (`/filters`): max distance km (default: any), snippet-language filter (default: any).
+- **Candidate selection:** not self, not already swiped (like or skip), active (not paused/deleted); real profiles first, then `last_active_at DESC`. When real unseen candidates run out → backfill with seed profiles (§6.6).
+- **Filters** (`/filters`): snippet-language filter (default: any).
 - Empty feed → friendly "no more candidates, check later / widen filters" message.
 
 ### 6.3 Likes
@@ -96,7 +94,7 @@ If the user has **no @username**, warn during onboarding: "Matches are shared vi
 
 On like, if a reciprocal like exists → create `matches` row, then send **both** users a reveal message:
 
-- The other's **photo**, name, age, city/distance, bio, all snippets
+- The other's **photo**, name, age, bio, all snippets
 - Contact link: `https://t.me/<username>`
 
 Edge case — **missing @username at match time:** the match is created, the side *with* a username gets "match pending"; the side *without* gets prompted to set a username; reveal completes on their next interaction once `from.username` is present.
@@ -130,13 +128,12 @@ To solve cold start, the DB is pre-filled with **generated fake profiles** befor
 | 1 | Onboarding + profile CRUD | Flow in §6.1; 18+ validation; preview + per-field edit |
 | 2 | Code snippet management | Paste in bot; 1–3 snippets; ≤1500 chars; language tag from fixed list |
 | 3 | Feed + like/skip | Card per §6.2; candidate selection + filters per §6.2 |
-| 4 | Geolocation matching | TG location share (lat/lng) + manual city fallback; haversine distance computed in app code |
-| 5 | Matching + reveal | Mutual like → match → photo + t.me link reveal to both; missing-username handling |
-| 6 | Notifications | Match = instant reveal message; likes = digest "you have N new likes", max 1 per 24h (§6.3) |
-| 7 | i18n RU/EN | All user-facing copy in two locale dictionaries |
-| 8 | `/delete` data wipe | |
-| 9 | Events logging | `events` table: `profile_complete`, `like`, `skip`, `match` for the §3 funnel |
-| 10 | Seed profiles | One-off seed script + curated snippet pool; ~100–300 fake profiles (§6.6) |
+| 4 | Matching + reveal | Mutual like → match → photo + t.me link reveal to both; missing-username handling |
+| 5 | Notifications | Match = instant reveal message; likes = digest "you have N new likes", max 1 per 24h (§6.3) |
+| 6 | i18n RU/EN | All user-facing copy in two locale dictionaries |
+| 7 | `/delete` data wipe | |
+| 8 | Events logging | `events` table: `profile_complete`, `like`, `skip`, `match` for the §3 funnel |
+| 9 | Seed profiles | One-off seed script + curated snippet pool; ~100–300 fake profiles (§6.6) |
 
 **P1 — fast follow (only after real users exist):**
 
@@ -193,10 +190,6 @@ users(
   gender        INTEGER NOT NULL,      -- binary: 0 = male, 1 = female (required at onboarding; display-only)
   bio           TEXT,
   photo_file_id TEXT,
-  city          TEXT,
-  lat           REAL,
-  lng           REAL,
-  max_dist_km   INTEGER,               -- filter, NULL = any
   lang_filter   TEXT,                  -- filter, NULL = any
   is_active     INTEGER NOT NULL DEFAULT 1,  -- 0 = paused/deleted/blocked bot
   is_fake       INTEGER NOT NULL DEFAULT 0,  -- 1 = generated seed profile (§6.6)
@@ -243,7 +236,6 @@ No `services/`, no `repositories/`, no DI container. Add structure only when pai
 | User blocks the bot | `sendMessage` throws → set `is_active=0`; resume on next `/start` |
 | Snippet > 1500 chars / empty | Reject with message, ask to resend |
 | User < 18 years old | Onboarding hard-stop |
-| No location and no city | Allowed; appears only in global feed, sees global feed |
 | Repeated `/start` | If mid-onboarding → resume from `state`; if done → show main menu |
 | Duplicate like | `UNIQUE(from_user,to_user)` constraint; silently ignore |
 | Code block formatting breaks | HTML parse mode, escape `<`, `>`, `&` in snippet content |
@@ -255,7 +247,7 @@ No `services/`, no `repositories/`, no DI container. Add structure only when pai
 | **Zero moderation in MVP** → harassment, fake/spam profiles | High | Accepted consciously. Fast-follow: block+report (P1) shipped at first sign of abuse. Telegram @usernames provide natural accountability. Monitor manually via D1 queries weekly. |
 | **Cold start / empty marketplace** — new user opens feed, sees nobody | High | **Seed the DB with generated fake profiles (§6.6)** so the feed is never empty: fakes backfill the feed only when real unseen candidates run out, never match, and phase out automatically as real density grows. Plus: growth plan (§13) seeds one community first; global feed by default early on; good "empty state" copy. |
 | **Overengineering relapse** (v1's cause of death) | High | This PRD's non-goals (§4) are the contract. Rule: nothing gets abstracted until it hurts twice. |
-| Gender imbalance typical of dev spaces | None (accepted) | Non-issue by design: devs meet by code/stack/location, not gender. The product never promises romantic outcomes, and gender is never a filter or matching signal. |
+| Gender imbalance typical of dev spaces | None (accepted) | Non-issue by design: devs meet by code and stack, not gender. The product never promises romantic outcomes, and gender is never a filter or matching signal. |
 | Solo dev, no deadline → drift | Medium | Milestones (§12) are small and demo-able; each ends with a working bot. |
 | D1/Workers limits | Low | Far below free-tier limits at MVP scale. |
 

@@ -18,9 +18,6 @@ type SeedProfile = {
   gender: 0 | 1;
   birthYear: number;
   bio: string;
-  city: string;
-  lat: number;
-  lng: number;
   snippets: SeedSnippet[];
 };
 
@@ -31,9 +28,6 @@ const PROFILES: SeedProfile[] = [
     gender: 0,
     birthYear: 1996,
     bio: "бэкенд и инфраструктура. люблю, когда ошибка живёт в типе, а не в проде",
-    city: "Москва",
-    lat: 55.7558,
-    lng: 37.6173,
     snippets: [
       {
         language: "Rust",
@@ -59,9 +53,6 @@ pub fn load_config(raw: &str) -> Result<u16, LoadError> {
     gender: 1,
     birthYear: 1998,
     bio: "data + python. если можно посчитать — лучше посчитать",
-    city: "Санкт-Петербург",
-    lat: 59.9311,
-    lng: 30.3609,
     snippets: [
       {
         language: "Python",
@@ -93,9 +84,6 @@ def merge(windows: list[Window]) -> list[Window]:
     gender: 0,
     birthYear: 1994,
     bio: "пишу сервисы на Go. ненавижу магические таймауты",
-    city: "Москва",
-    lat: 55.7512,
-    lng: 37.6184,
     snippets: [
       {
         language: "Go",
@@ -120,9 +108,6 @@ func fetchUser(ctx context.Context, id string) (*User, error) {
     gender: 1,
     birthYear: 1999,
     bio: "фронт, дизайн-системы, злость на !important",
-    city: "Тбилиси",
-    lat: 41.7151,
-    lng: 44.8271,
     snippets: [
       {
         language: "TS",
@@ -145,9 +130,6 @@ export function parseHex(input: string): Result<number, string> {
     gender: 0,
     birthYear: 1993,
     bio: "ML без слайдов. если модель не бьёт эвристику — модели нет",
-    city: "Алматы",
-    lat: 43.238,
-    lng: 76.945,
     snippets: [
       {
         language: "Python",
@@ -171,9 +153,6 @@ def topk(scores: list[float], k: int) -> list[int]:
     gender: 1,
     birthYear: 2001,
     bio: "android, kotlin, иногда compose ради удовольствия",
-    city: "Ереван",
-    lat: 40.1792,
-    lng: 44.4991,
     snippets: [
       {
         language: "Kotlin",
@@ -201,9 +180,6 @@ def topk(scores: list[float], k: int) -> list[int]:
     gender: 0,
     birthYear: 1995,
     bio: "embedded / C++. считаю такты, не сторипоинты",
-    city: "Москва",
-    lat: 55.76,
-    lng: 37.6,
     snippets: [
       {
         language: "C++",
@@ -232,9 +208,6 @@ class Ring {
     gender: 1,
     birthYear: 1997,
     bio: "продуктовый фронт. живу в Берлине, скучаю по нормальному чаю",
-    city: "Берлин",
-    lat: 52.52,
-    lng: 13.405,
     snippets: [
       {
         language: "TS",
@@ -255,9 +228,6 @@ class Ring {
     gender: 0,
     birthYear: 1992,
     bio: "java, spring, очередь, которая почему-то всегда полная",
-    city: "Санкт-Петербург",
-    lat: 59.94,
-    lng: 30.31,
     snippets: [
       {
         language: "Java",
@@ -284,9 +254,6 @@ class Ring {
     gender: 1,
     birthYear: 2000,
     bio: "js, анимации, иногда слишком много анимаций",
-    city: "Варшава",
-    lat: 52.2297,
-    lng: 21.0122,
     snippets: [
       {
         language: "JS",
@@ -310,9 +277,6 @@ export function damp(current, target, lambda, dt) {
     gender: 0,
     birthYear: 1995,
     bio: "distributed systems, bad coffee, good tests",
-    city: "Berlin",
-    lat: 52.501,
-    lng: 13.41,
     snippets: [
       {
         language: "Go",
@@ -343,9 +307,6 @@ func (c *Circuit) Fail() {
     gender: 1,
     birthYear: 1998,
     bio: "python, notebooks that accidentally became services",
-    city: "London",
-    lat: 51.5074,
-    lng: -0.1278,
     snippets: [
       {
         language: "Python",
@@ -370,9 +331,6 @@ func (c *Circuit) Fail() {
     gender: 0,
     birthYear: 1994,
     bio: "typescript maximalist. if it compiles, I ship it",
-    city: "New York",
-    lat: 40.7128,
-    lng: -74.006,
     snippets: [
       {
         language: "TS",
@@ -397,9 +355,6 @@ export function describe(job: Job): string {
     gender: 1,
     birthYear: 1996,
     bio: "iOS. I will argue about navigation stacks",
-    city: "San Francisco",
-    lat: 37.7749,
-    lng: -122.4194,
     snippets: [
       {
         language: "Swift",
@@ -425,9 +380,6 @@ export function describe(job: Job): string {
     gender: 0,
     birthYear: 1991,
     bio: "rust + compilers. weekends are for unused side projects",
-    city: "London",
-    lat: 51.515,
-    lng: -0.09,
     snippets: [
       {
         language: "Rust",
@@ -453,9 +405,6 @@ export function describe(job: Job): string {
     gender: 1,
     birthYear: 1999,
     bio: "android, maps, and too many snackbars",
-    city: "Warsaw",
-    lat: 52.23,
-    lng: 21.01,
     snippets: [
       {
         language: "Kotlin",
@@ -482,9 +431,6 @@ fun haversine(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
     gender: 0,
     birthYear: 1993,
     bio: "jvm backend. I still like checked exceptions a little",
-    city: "New York",
-    lat: 40.73,
-    lng: -73.99,
     snippets: [
       {
         language: "Java",
@@ -508,9 +454,6 @@ fun haversine(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
     gender: 1,
     birthYear: 1997,
     bio: "ruby, rails, and deleting code with joy",
-    city: "Tbilisi",
-    lat: 41.7225,
-    lng: 44.7925,
     snippets: [
       {
         language: "Ruby",
@@ -539,9 +482,6 @@ end`,
     gender: 0,
     birthYear: 1996,
     bio: "C# / game tools. I debug with prints and pride",
-    city: "San Francisco",
-    lat: 37.78,
-    lng: -122.41,
     snippets: [
       {
         language: "C#",
@@ -564,9 +504,6 @@ public static class Cooldown
     gender: 1,
     birthYear: 2000,
     bio: "js, design, and fighting layout shift",
-    city: "Berlin",
-    lat: 52.51,
-    lng: 13.39,
     snippets: [
       {
         language: "JS",
@@ -590,9 +527,6 @@ export function unique(items) {
     gender: 0,
     birthYear: 1998,
     bio: "php, легаси, и внезапная любовь к типам",
-    city: "Алматы",
-    lat: 43.2567,
-    lng: 76.9286,
     snippets: [
       {
         language: "PHP",
@@ -619,9 +553,6 @@ export function unique(items) {
     gender: 1,
     birthYear: 1995,
     bio: "python, etl, графики, которые никто не открывает",
-    city: "Москва",
-    lat: 55.74,
-    lng: 37.62,
     snippets: [
       {
         language: "Python",
@@ -639,9 +570,6 @@ def normalize(name: str) -> str:
     gender: 0,
     birthYear: 1992,
     bio: "php that wants to be rust when it grows up",
-    city: "London",
-    lat: 51.503,
-    lng: -0.12,
     snippets: [
       {
         language: "PHP",
@@ -663,9 +591,6 @@ def normalize(name: str) -> str:
     gender: 0,
     birthYear: 1990,
     bio: "ruby с 2012. всё ещё не устал от блоков",
-    city: "Санкт-Петербург",
-    lat: 59.95,
-    lng: 30.32,
     snippets: [
       {
         language: "Ruby",
@@ -688,9 +613,6 @@ end`,
     gender: 0,
     birthYear: 1997,
     bio: "ts, product, and one too many side quests",
-    city: "Warsaw",
-    lat: 52.24,
-    lng: 21.02,
     snippets: [
       {
         language: "TS",
@@ -710,9 +632,6 @@ export function compact<T>(xs: Array<T | null | undefined>): T[] {
     gender: 1,
     birthYear: 1997,
     bio: "графика, C++, и вечный спор про руки vs движок",
-    city: "Новосибирск",
-    lat: 55.0084,
-    lng: 82.9357,
     snippets: [
       {
         language: "C++",
@@ -732,9 +651,6 @@ float length2(const Vec2& v) { return v.x * v.x + v.y * v.y; }`,
     gender: 0,
     birthYear: 1993,
     bio: "wasm, rust, and build times I pretend not to notice",
-    city: "Lisbon",
-    lat: 38.7223,
-    lng: -9.1393,
     snippets: [
       {
         language: "Rust",
@@ -756,9 +672,6 @@ pub fn nonempty(s: &str) -> Option<&str> {
     gender: 1,
     birthYear: 2000,
     bio: "iOS. если навигация сломалась — это я её чинила вчера",
-    city: "Прага",
-    lat: 50.0755,
-    lng: 14.4378,
     snippets: [
       {
         language: "Swift",
@@ -784,9 +697,6 @@ func mapLoad<T, U>(_ value: Load<T>, _ f: (T) -> U) -> Load<U> {
     gender: 0,
     birthYear: 1996,
     bio: "C# services. I name things twice and still get it wrong",
-    city: "Amsterdam",
-    lat: 52.3676,
-    lng: 4.9041,
     snippets: [
       {
         language: "C#",
@@ -819,9 +729,6 @@ func mapLoad<T, U>(_ value: Load<T>, _ f: (T) -> U) -> Load<U> {
     gender: 0,
     birthYear: 1994,
     bio: "sre. падаю раньше, чем падает прод. иногда",
-    city: "Хельсинки",
-    lat: 60.1699,
-    lng: 24.9384,
     snippets: [
       {
         language: "Go",
@@ -865,12 +772,12 @@ function buildSql(now: number): string {
     lines.push(
       [
         "INSERT INTO users (",
-        "id, username, locale, state, name, birth_year, gender, bio, city, lat, lng,",
-        "max_dist_km, lang_filter, is_active, is_fake, last_active_at, last_like_notif_at, created_at",
+        "id, username, locale, state, name, birth_year, gender, bio, lang_filter,",
+        "is_active, is_fake, last_active_at, last_like_notif_at, created_at",
         ") VALUES (",
         `${id}, NULL, ${sqlText(profile.locale)}, NULL, ${sqlText(profile.name)}, ${profile.birthYear}, ${profile.gender},`,
-        `${sqlText(profile.bio)}, ${sqlText(profile.city)}, ${profile.lat}, ${profile.lng},`,
-        "NULL, NULL, 1, 1, ",
+        `${sqlText(profile.bio)},`,
+        "NULL, 1, 1, ",
         `${lastActiveAt}, NULL, ${createdAt}`,
         ");",
       ].join(""),

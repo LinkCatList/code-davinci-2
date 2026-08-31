@@ -47,8 +47,7 @@ async function safeSend(api: Api, db: Db, chatId: number, send: () => Promise<un
 function matchText(to: UserRecord, other: UserRecord, nowMs: number): string {
   const locale = localeOf(to);
   const age = other.birthYear != null ? ageFromBirthYear(other.birthYear, nowMs) : "?";
-  const place = other.city ? `, ${escapeHtml(other.city)}` : "";
-  return `${t(locale, "matchTitle")}\n\n<b>${escapeHtml(other.name ?? "")}</b>, ${age}${place}\nhttps://t.me/${other.username}`;
+  return `${t(locale, "matchTitle")}\n\n<b>${escapeHtml(other.name ?? "")}</b>, ${age}\nhttps://t.me/${other.username}`;
 }
 
 async function sendReveal(
@@ -176,11 +175,10 @@ export async function handleMatchesCommand(ctx: OutsideContext): Promise<void> {
   for (const { other } of pairs) {
     const name = other.name ?? "?";
     const age = other.birthYear != null ? String(ageFromBirthYear(other.birthYear, nowMs)) : "?";
-    const place = other.city ? `, ${other.city}` : "";
     if (other.username) {
-      lines.push(`${name}, ${age}${place} — https://t.me/${other.username}`);
+      lines.push(`${name}, ${age} — https://t.me/${other.username}`);
     } else {
-      lines.push(`${name}, ${age}${place} — ${t(ctx.locale, "matchPendingWait")}`);
+      lines.push(`${name}, ${age} — ${t(ctx.locale, "matchPendingWait")}`);
     }
   }
   let text = lines.join("\n");

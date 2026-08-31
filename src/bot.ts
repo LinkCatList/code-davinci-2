@@ -219,7 +219,7 @@ export function createBot(
   });
 
   bot.command("profile", handleProfileCommand);
-  bot.callbackQuery(/^pf:(name|year|gender|bio|loc|snippets)$/, handleProfileCallback);
+  bot.callbackQuery(/^pf:(name|year|gender|bio|snippets)$/, handleProfileCallback);
   bot.command("feed", handleFeedCommand);
   bot.command("likes", replyNextIncomingLike);
   bot.command("matches", handleMatchesCommand);

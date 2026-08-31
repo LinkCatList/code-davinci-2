@@ -24,7 +24,6 @@ import {
   matchPreviewButton,
   onboardingGenderKeyboard,
   onboardingLangKeyboard,
-  onboardingLocationKeyboard,
   onboardingPreviewKeyboard,
   onboardingSkipKeyboard,
   profileKeyboard,
@@ -52,7 +51,6 @@ const STEPS = [
   "onboarding:year",
   "onboarding:gender",
   "onboarding:bio",
-  "onboarding:location",
   "onboarding:snippets",
   "onboarding:preview",
 ] as const;
@@ -62,6 +60,7 @@ type OnboardingStep = (typeof STEPS)[number];
 function normalizeStep(state: string | null): OnboardingStep {
   if (state === "onboarding" || state === null) return "onboarding:lang";
   if (state === "onboarding:photo") return "onboarding:snippets";
+  if (state === "onboarding:location") return "onboarding:lang";
   if ((STEPS as readonly string[]).includes(state)) return state as OnboardingStep;
   return "onboarding:lang";
 }
@@ -339,55 +338,6 @@ export async function askBio(
   }
 }
 
-export async function askLocation(
-  conversation: OnboardingConversation,
-  ctx: Context,
-  locale: Locale,
-  cancelText?: string,
-): Promise<void> {
-  const stop = cancelText ?? t(locale, "onboardingCancelled");
-  const send = (target: Context) =>
-    target.reply(t(locale, "onboardingLocation"), {
-      reply_markup: onboardingLocationKeyboard(locale),
-    });
-  await send(ctx);
-  for (;;) {
-    const next = await waitUpdate(conversation, send, stop);
-    if (next.callbackQuery?.data === "ob:skip:loc") {
-      await dropMarkup(next);
-      await saveUser(conversation, { city: null, lat: null, lng: null });
-      return;
-    }
-    const location = next.message?.location;
-    if (location) {
-      await saveUser(conversation, {
-        city: null,
-        lat: location.latitude,
-        lng: location.longitude,
-      });
-      return;
-    }
-    const text = next.message?.text?.trim();
-    if (text) {
-      if (isSkipText(text, locale)) {
-        await saveUser(conversation, { city: null, lat: null, lng: null });
-        return;
-      }
-      if (isReservedInput(text)) {
-        await next.reply(t(locale, "onboardingLocationBad"), {
-          reply_markup: onboardingLocationKeyboard(locale),
-        });
-        continue;
-      }
-      await saveUser(conversation, { city: text, lat: null, lng: null });
-      return;
-    }
-    await next.reply(t(locale, "onboardingLocationBad"), {
-      reply_markup: onboardingLocationKeyboard(locale),
-    });
-  }
-}
-
 export async function askSnippetText(
   conversation: OnboardingConversation,
   ctx: Context,
@@ -477,7 +427,6 @@ async function askPreview(
     name: user.name ?? "",
     birthYear: user.birthYear ?? 0,
     bio: user.bio,
-    city: user.city,
     gender: user.gender,
     locale,
     snippets,
@@ -553,13 +502,6 @@ export async function onboarding(conversation: OnboardingConversation, ctx: Cont
 
     if (step === "onboarding:bio") {
       await askBio(conversation, ctx, locale);
-      await setStep(conversation, "onboarding:location");
-      step = "onboarding:location";
-      user = (await loadUser(conversation)) ?? user;
-    }
-
-    if (step === "onboarding:location") {
-      await askLocation(conversation, ctx, locale);
       await setStep(conversation, "onboarding:snippets");
       step = "onboarding:snippets";
       user = (await loadUser(conversation)) ?? user;

@@ -1,4 +1,3 @@
-import { formatDistanceKm } from "../geo";
 import { snippetFenceId } from "../snippet-languages";
 import { t, type Locale } from "../t";
 
@@ -26,12 +25,10 @@ export function renderOwnCard(input: {
   name: string;
   birthYear: number;
   bio: string | null;
-  city: string | null;
   gender?: number | null;
   locale?: Locale;
   snippets: CardSnippet[];
   nowMs: number;
-  distanceKm?: number | null;
   includeAllSnippets?: boolean;
   header?: string;
   footer?: string;
@@ -39,7 +36,6 @@ export function renderOwnCard(input: {
   const snippets = [...input.snippets].sort((a, b) => a.position - b.position);
   const shown = input.includeAllSnippets ? snippets : snippets.slice(0, 1);
   const age = ageFromBirthYear(input.birthYear, input.nowMs);
-  const langs = snippets.map((snippet) => snippet.language).join(" · ");
   const gender = genderLabel(input.locale, input.gender);
 
   const lines: string[] = [];
@@ -49,9 +45,6 @@ export function renderOwnCard(input: {
     lines.push(`<pre><code class="language-${fence}">${escapeHtml(snippet.content)}</code></pre>`, "");
   }
   lines.push(`<b>${escapeHtml(input.name)}</b>, ${age}${gender ? `, ${escapeHtml(gender)}` : ""}`);
-  if (langs) lines.push(escapeHtml(langs));
-  if (input.city) lines.push(escapeHtml(input.city));
-  if (input.distanceKm != null) lines.push(escapeHtml(formatDistanceKm(input.distanceKm)));
   if (input.bio) lines.push(escapeHtml(input.bio));
   if (input.footer) lines.push("", input.footer);
 

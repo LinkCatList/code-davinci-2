@@ -32,14 +32,11 @@ const CHROME_KEYS = [
   "profileSnippets",
   "profileBio",
   "profilePause",
-  "profileLikes",
-  "profileMatches",
   "onboardingLangRu",
   "onboardingLangEn",
   "onboardingGenderMale",
   "onboardingGenderFemale",
   "onboardingSkip",
-  "onboardingShareLocation",
   "onboardingConfirm",
   "onboardingStartOver",
 ] as const;
@@ -55,8 +52,6 @@ export function menuLegend(mode: "home" | "profile" | "paused", locale: Locale):
       t(locale, "profileRestart"),
       t(locale, "profileSnippets"),
       t(locale, "profileBio"),
-      t(locale, "profileLikes"),
-      t(locale, "profileMatches"),
     ].join("\n");
   }
   if (mode === "paused") {
@@ -87,9 +82,7 @@ export function browseKeyboard(locale: Locale): Keyboard {
 }
 
 export function profileKeyboard(_locale?: Locale): Keyboard {
-  return persist(
-    new Keyboard().text(MENU_BROWSE_BUTTON).text("2").text("3").row().text("4").text("5").text("6"),
-  );
+  return persist(new Keyboard().text(MENU_BROWSE_BUTTON).text("2").text("3").row().text("4"));
 }
 
 export function pausedKeyboard(_locale?: Locale): Keyboard {
@@ -128,14 +121,6 @@ export function onboardingSkipKeyboard(locale: Locale): Keyboard {
   return new Keyboard().text(t(locale, "onboardingSkip")).resized();
 }
 
-export function onboardingLocationKeyboard(locale: Locale): Keyboard {
-  return new Keyboard()
-    .requestLocation(t(locale, "onboardingShareLocation"))
-    .row()
-    .text(t(locale, "onboardingSkip"))
-    .resized();
-}
-
 export function onboardingPreviewKeyboard(locale: Locale): Keyboard {
   return new Keyboard()
     .text(t(locale, "onboardingConfirm"))
@@ -158,23 +143,17 @@ function exactActionMap(locale: Locale): Map<string, MenuAction> {
     [t(locale, "menuHide"), "pause"],
     [t(locale, "menuLikes"), "likes"],
     [t(locale, "menuMatches"), "matches"],
-    [t(locale, "profileLikes"), "likes"],
-    [t(locale, "profileMatches"), "matches"],
     [MENU_BROWSE_BUTTON, "browse"],
     ["1. Browse", "browse"],
     ["2. My card", "profile"],
     ["3. Hide card", "pause"],
     ["3. Likes", "likes"],
     ["4. Matches", "matches"],
-    ["5. Likes", "likes"],
-    ["6. Matches", "matches"],
     ["1. Смотреть анкеты", "browse"],
     ["2. Моя анкета", "profile"],
     ["3. Скрыть анкету", "pause"],
     ["3. Лайки", "likes"],
     ["4. Мэтчи", "matches"],
-    ["5. Лайки", "likes"],
-    ["6. Мэтчи", "matches"],
     ["🔍", "browse"],
     ["👤", "profile"],
     ["📭", "likes"],
@@ -227,7 +206,7 @@ const DIGITS: Record<BrowseMode, Array<MenuAction | undefined>> = {
   home: ["browse", "profile", "pause"],
   feed: ["like", "skip", "sleep"],
   inbox: ["like", "skip", "sleep"],
-  profile: ["browse", "restart", "snippets", "bio", "likes", "matches"],
+  profile: ["browse", "restart", "snippets", "bio"],
   paused: ["browse"],
 };
 

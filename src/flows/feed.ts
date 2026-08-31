@@ -12,7 +12,6 @@ import {
   setBrowseState,
   type UserRecord,
 } from "../db/queries";
-import { distanceBetween } from "../geo";
 import { browseKeyboard, homeKeyboard, withMenuLegend } from "../keyboards";
 import { t } from "../t";
 import { renderOwnCard } from "./card";
@@ -33,26 +32,24 @@ async function loadNextFeedCard(
 ): Promise<FeedCard | null> {
   let candidates = await listFeedCandidates(db, viewer);
   while (candidates.length > 0) {
-    const picked = pickCandidate(viewer, candidates);
+    const picked = pickCandidate(candidates);
     if (!picked) return null;
-    const snippets = await listSnippets(db, picked.user.id);
-    if (picked.user.name !== null && picked.user.birthYear !== null && snippets.length > 0) {
+    const snippets = await listSnippets(db, picked.id);
+    if (picked.name !== null && picked.birthYear !== null && snippets.length > 0) {
       return {
-        candidateId: picked.user.id,
+        candidateId: picked.id,
         html: renderOwnCard({
-          name: picked.user.name,
-          birthYear: picked.user.birthYear,
-          bio: picked.user.bio,
-          city: picked.user.city,
-          gender: picked.user.gender,
+          name: picked.name,
+          birthYear: picked.birthYear,
+          bio: picked.bio,
+          gender: picked.gender,
           locale,
           snippets,
           nowMs,
-          distanceKm: picked.distanceKm,
         }),
       };
     }
-    candidates = candidates.filter((row) => row.id !== picked.user.id);
+    candidates = candidates.filter((row) => row.id !== picked.id);
   }
   return null;
 }
@@ -73,12 +70,10 @@ async function loadNextIncomingCard(
         name: liker.name,
         birthYear: liker.birthYear,
         bio: liker.bio,
-        city: liker.city,
         gender: liker.gender,
         locale,
         snippets,
         nowMs,
-        distanceKm: distanceBetween(viewer, liker),
         header: t(locale, "likesCardHint"),
       }),
     };
