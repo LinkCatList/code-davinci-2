@@ -67,9 +67,9 @@ function normalizeStep(state: string | null): OnboardingStep {
 
 function commandName(ctx: Context): string | undefined {
   const raw = ctx.message?.text;
-  if (!raw?.startsWith("/")) return undefined;
-  const name = raw.slice(1).split(/[\s@]/)[0];
-  return name?.toLowerCase() || undefined;
+  if (!raw) return undefined;
+  const match = /^\/([a-z0-9_]+)(?:@[a-z0-9_]+)?(?:\s|$)/i.exec(raw);
+  return match?.[1]?.toLowerCase();
 }
 
 async function dropMarkup(ctx: Context): Promise<void> {
