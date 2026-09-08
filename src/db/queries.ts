@@ -93,6 +93,17 @@ export async function clearOnboardingFields(db: Db, userId: number): Promise<voi
   await db.delete(snippets).where(eq(snippets.userId, userId));
 }
 
+export async function beginProfileRefill(db: Db, userId: number): Promise<void> {
+  await db
+    .update(users)
+    .set({
+      state: "onboarding:refill:name",
+      lastCardUserId: null,
+      browseMode: null,
+    })
+    .where(eq(users.id, userId));
+}
+
 export async function completeProfile(db: Db, userId: number): Promise<void> {
   await db.update(users).set({ state: null, isActive: 1 }).where(eq(users.id, userId));
   await insertEventOnce(db, userId, "profile_complete");

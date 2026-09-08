@@ -26,6 +26,7 @@ export const en = {
   onboardingBio: "A short bio, optional. Max 300 characters.",
   onboardingBioBad: "Keep it to 300 characters, or tap Skip.",
   onboardingSkip: "Skip",
+  onboardingKeepPrevious: "Keep previous",
   onboardingSnippet: "Paste a code snippet (max 1500 characters). People swipe on this, not on your face.",
   onboardingSnippetBad: "Paste the code as text, 1–1500 characters.",
   onboardingSnippetLang: "Which language is that?",

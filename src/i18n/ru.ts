@@ -28,6 +28,7 @@ export const ru: { [K in keyof typeof en]: string } = {
   onboardingBio: "Короткое био, по желанию. До 300 символов.",
   onboardingBioBad: "До 300 символов или нажми Пропустить.",
   onboardingSkip: "Пропустить",
+  onboardingKeepPrevious: "Оставить прежнее",
   onboardingSnippet: "Вставь сниппет кода (до 1500 символов). По нему свайпают, не по лицу.",
   onboardingSnippetBad: "Вставь код текстом, 1–1500 символов.",
   onboardingSnippetLang: "На каком это языке?",

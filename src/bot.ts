@@ -3,7 +3,7 @@ import { Bot, type Context } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 import { drizzle } from "drizzle-orm/d1";
 import {
-  clearOnboardingFields,
+  beginProfileRefill,
   getUser,
   isOnboarding,
   isProfileComplete,
@@ -73,8 +73,8 @@ async function restartProfile(ctx: BotContext): Promise<void> {
     await ctx.conversation.exit("editProfile");
   }
   if (ctx.conversation.active("onboarding") > 0) return;
-  await clearOnboardingFields(ctx.db, ctx.from.id);
-  await ctx.conversation.enter("onboarding");
+  await beginProfileRefill(ctx.db, ctx.from.id);
+  await ctx.conversation.enter("onboarding", "refill");
 }
 
 async function pauseProfile(ctx: BotContext): Promise<void> {
@@ -192,7 +192,7 @@ export function createBot(
     conversations<BotContext, Context>({
       storage: {
         type: "key",
-        version: 4,
+        version: 5,
         getStorageKey: (ctx) => (ctx.from ? String(ctx.from.id) : undefined),
         adapter: d1SessionStorage(env.DB),
       },

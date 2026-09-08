@@ -121,6 +121,31 @@ export function onboardingSkipKeyboard(locale: Locale): Keyboard {
   return new Keyboard().text(t(locale, "onboardingSkip")).resized();
 }
 
+export function onboardingPreviousKeyboard(
+  previous: string | number | null | undefined,
+): Keyboard | typeof REMOVE_KEYBOARD {
+  if (previous === null || previous === undefined || previous === "") return REMOVE_KEYBOARD;
+  return new Keyboard().text(String(previous)).resized();
+}
+
+export function onboardingBioKeyboard(locale: Locale, previous: string | null): Keyboard {
+  const keyboard = new Keyboard();
+  if (previous) {
+    keyboard
+      .text(previous.length <= 40 ? previous : t(locale, "onboardingKeepPrevious"))
+      .row();
+  }
+  return keyboard.text(t(locale, "onboardingSkip")).resized();
+}
+
+export function onboardingSnippetKeyboard(
+  locale: Locale,
+  hasPrevious: boolean,
+): Keyboard | typeof REMOVE_KEYBOARD {
+  if (!hasPrevious) return REMOVE_KEYBOARD;
+  return new Keyboard().text(t(locale, "onboardingKeepPrevious")).resized();
+}
+
 export function onboardingPreviewKeyboard(locale: Locale): Keyboard {
   return new Keyboard()
     .text(t(locale, "onboardingConfirm"))
