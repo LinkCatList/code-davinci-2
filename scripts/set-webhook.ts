@@ -31,9 +31,6 @@ const commands = (d: typeof ru) => [
   { command: "profile", description: d.cmdProfile },
   { command: "likes", description: d.cmdLikes },
   { command: "matches", description: d.cmdMatches },
-  { command: "filters", description: d.cmdFilters },
-  { command: "language", description: d.cmdLanguage },
-  { command: "delete", description: d.cmdDelete },
   { command: "cancel", description: d.cmdCancel },
 ];
 

@@ -76,9 +76,6 @@ function commands(dictionary: typeof ru) {
     { command: "profile", description: dictionary.cmdProfile },
     { command: "likes", description: dictionary.cmdLikes },
     { command: "matches", description: dictionary.cmdMatches },
-    { command: "filters", description: dictionary.cmdFilters },
-    { command: "language", description: dictionary.cmdLanguage },
-    { command: "delete", description: dictionary.cmdDelete },
     { command: "cancel", description: dictionary.cmdCancel },
   ];
 }
@@ -114,6 +111,18 @@ async function telegram<T>(config: TelegramConfig, method: string, body: unknown
   return json.result as T;
 }
 
+export async function registerBotCommands(config: TelegramConfig): Promise<void> {
+  await telegram<true>(config, "setMyCommands", { commands: commands(en) });
+  await telegram<true>(config, "setMyCommands", {
+    commands: commands(ru),
+    language_code: "ru",
+  });
+  await telegram<true>(config, "setMyCommands", {
+    commands: commands(en),
+    language_code: "en",
+  });
+}
+
 export async function registerWebhook(config: TelegramConfig, workerUrl: string): Promise<string> {
   const webhookUrl = buildWebhookUrl(workerUrl, config.secret);
 
@@ -124,15 +133,7 @@ export async function registerWebhook(config: TelegramConfig, workerUrl: string)
     drop_pending_updates: true,
   });
 
-  await telegram<true>(config, "setMyCommands", { commands: commands(en) });
-  await telegram<true>(config, "setMyCommands", {
-    commands: commands(ru),
-    language_code: "ru",
-  });
-  await telegram<true>(config, "setMyCommands", {
-    commands: commands(en),
-    language_code: "en",
-  });
+  await registerBotCommands(config);
 
   const info = await telegram<WebhookInfo>(config, "getWebhookInfo", {});
   if (info.url !== webhookUrl) {

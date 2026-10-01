@@ -8,7 +8,6 @@ import {
   isOnboarding,
   isProfileComplete,
   listSnippets,
-  setBrowseState,
   setUserPaused,
   upsertUser,
 } from "./db/queries";
@@ -28,7 +27,6 @@ import { onboarding, type OutsideContext } from "./flows/onboarding";
 import { editProfile, handleProfileCallback, handleProfileCommand, startProfileEdit } from "./flows/profile";
 import { isPausedUser, parseBrowseMode, replyPaused, replyProfileScreen } from "./flows/screens";
 import {
-  homeKeyboard,
   keyboardFor,
   looksLikeOtherLocaleMenu,
   matchMenuAction,
@@ -38,25 +36,6 @@ import {
 import { t } from "./t";
 
 export type BotContext = OutsideContext;
-
-const STUB_COMMANDS = ["filters", "language", "delete"] as const;
-
-async function replyStub(ctx: BotContext): Promise<void> {
-  if (!ctx.from) return;
-  const user = await getUser(ctx.db, ctx.from.id);
-  if (user && isOnboarding(user)) {
-    await ctx.reply(t(ctx.locale, "finishOnboardingFirst"));
-    return;
-  }
-  if (user && isPausedUser(user)) {
-    await replyPaused(ctx);
-    return;
-  }
-  await setBrowseState(ctx.db, ctx.from.id, "home", null);
-  await ctx.reply(withMenuLegend(t(ctx.locale, "comingSoon"), "home", ctx.locale), {
-    reply_markup: homeKeyboard(ctx.locale),
-  });
-}
 
 async function restartProfile(ctx: BotContext): Promise<void> {
   if (!ctx.from) return;
@@ -250,10 +229,6 @@ export function createBot(
     }
     await ctx.reply(t(ctx.locale, "nothingToCancel"));
   });
-
-  for (const command of STUB_COMMANDS) {
-    bot.command(command, replyStub);
-  }
 
   bot.on("message:text", handleMenuText);
 
