@@ -71,7 +71,6 @@ function normalizeStep(state: string | null): OnboardingStep {
   }
   if (state === "onboarding" || state === null) return "onboarding:lang";
   if (state === "onboarding:photo") return "onboarding:snippets";
-  if (state === "onboarding:location") return "onboarding:lang";
   if ((STEPS as readonly string[]).includes(state)) return state as OnboardingStep;
   return "onboarding:lang";
 }
