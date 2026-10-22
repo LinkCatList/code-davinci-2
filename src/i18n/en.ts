@@ -57,7 +57,7 @@ export const en = {
   profileSnippets: "3. Snippet",
   profileBio: "4. Text",
   profilePause: "5. Hide card",
-  homeWait: "We'll wait until someone sees your card.",
+  homeWait: "There are no active profiles right now. Please check back later.",
   pausedHint: "Your card is hidden. You won't appear in the feed.",
   useMenu: "Use the buttons below.",
   openCardsFirst: "Open cards first.",

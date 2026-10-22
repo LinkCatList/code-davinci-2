@@ -59,7 +59,7 @@ export const ru: { [K in keyof typeof en]: string } = {
   profileSnippets: "3. Сниппет",
   profileBio: "4. Текст",
   profilePause: "5. Скрыть анкету",
-  homeWait: "Подождём, пока кто-то увидит твою анкету.",
+  homeWait: "Сейчас нет активных анкет. Загляни позже.",
   pausedHint: "Анкета скрыта. Тебя не видно в ленте.",
   useMenu: "Нажми кнопку внизу.",
   openCardsFirst: "Сначала открой анкеты.",
