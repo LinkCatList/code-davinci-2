@@ -44,13 +44,15 @@ WORKER_URL=https://64ce59a9c5d14b.lhr.life pnpm webhook
 
 Changes are picked up by Wrangler without a deploy.
 
-## Optional seed data
+## Optional local seed data
 
-To generate the fake profiles used by the feed and load them into local D1:
+To generate fake profile fixtures and load them into local D1:
 
 ```bash
 pnpm db:seed
 pnpm exec wrangler d1 execute DB --local --file=.temp/seed.sql
 ```
+
+The application excludes these fixtures from the feed, incoming likes, and matches.
 
 Use `pnpm db:migrate:remote` and `pnpm deploy` only for deliberate production changes.

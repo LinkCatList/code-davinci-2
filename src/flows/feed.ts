@@ -142,7 +142,9 @@ export async function applySwipe(
   toUser: number,
   action: "like" | "skip",
 ): Promise<"match" | "swiped" | "ignored"> {
-  if (!Number.isFinite(toUser) || toUser === viewer.id) return "ignored";
+  if (!Number.isFinite(toUser) || toUser === viewer.id || viewer.isFake === 1) return "ignored";
+  const target = await getUser(ctx.db, toUser);
+  if (!target || target.isFake === 1) return "ignored";
   const inserted =
     action === "like"
       ? await insertLike(ctx.db, viewer.id, toUser)

@@ -106,18 +106,9 @@ Edge case — **missing @username at match time:** the match is created, the sid
 - `/delete` — wipe all user data (confirm first). Tiny feature, basic data hygiene.
 - `/language` — switch RU/EN.
 
-### 6.6 Seed (fake) profiles
+### 6.6 Seed (fake) profiles — disabled
 
-To solve cold start, the DB is pre-filled with **generated fake profiles** before launch. Rules:
-
-1. **Backfill only:** fakes appear in the feed only when the user has exhausted real unseen candidates (real-first ordering). This makes phase-out self-regulating — as real user density grows, fakes naturally stop appearing.
-2. **Fakes never match:** a like on a fake is stored but never reciprocated; fakes never initiate likes and never contribute to like-digest notifications. *Rationale:* match reveal exchanges real Telegram @usernames — a fake has none, and a match that can never be revealed is worse than no match.
-3. **Fakes have no photo** (`photo_file_id = NULL`): photos are only revealed on match, and fakes never match — so no fake faces are ever needed. This keeps seeding simple and avoids using generated/stolen photos of people.
-4. **Flagged in DB:** `users.is_fake = 1`. Fakes are excluded from the §3 metrics funnel and from `events`.
-5. **Generation:** one-off seed script (`scripts/seed.ts`, run via wrangler against D1) creating ~100–300 profiles: plausible RU/EN names, gender, bios, cities/coords spread across target dev hubs, and code snippets from a curated hand-written pool (per language). No AI-generation pipeline, no external APIs — a static data file + insert loop.
-6. **Cleanup:** fakes can be bulk-deleted later via `is_fake` once real density is self-sustaining.
-
-> Open experiment (P1, only if retention is weak): let fakes occasionally like *new* users to trigger the re-engagement notification. Deliberately NOT in MVP — fake notifications erode trust in the core loop.
+Generated fake profiles are disabled in the product. Rows marked `users.is_fake = 1` are excluded from feed candidates, incoming likes, and matches, and swipes against them are ignored. The optional seed script is kept only to create local development fixtures; it does not populate the product feed.
 
 ## 7. Feature Requirements (prioritized)
 
@@ -133,7 +124,7 @@ To solve cold start, the DB is pre-filled with **generated fake profiles** befor
 | 6 | i18n RU/EN | All user-facing copy in two locale dictionaries |
 | 7 | `/delete` data wipe | |
 | 8 | Events logging | `events` table: `profile_complete`, `like`, `skip`, `match` for the §3 funnel |
-| 9 | Seed profiles | One-off seed script + curated snippet pool; ~100–300 fake profiles (§6.6) |
+| 9 | Local seed fixtures | Optional fake-profile fixtures for local development only (§6.6) |
 
 **P1 — fast follow (only after real users exist):**
 
@@ -222,7 +213,7 @@ src/
   i18n/           -- ru.ts, en.ts
   t.ts            -- t() helper
 scripts/
-  seed.ts         -- one-off fake-profile seeder (§6.6)
+  seed.ts         -- local fake-profile fixtures only (§6.6)
 wrangler.toml
 ```
 
@@ -245,7 +236,7 @@ No `services/`, no `repositories/`, no DI container. Add structure only when pai
 | Risk | Severity | Mitigation |
 |---|---|---|
 | **Zero moderation in MVP** → harassment, fake/spam profiles | High | Accepted consciously. Fast-follow: block+report (P1) shipped at first sign of abuse. Telegram @usernames provide natural accountability. Monitor manually via D1 queries weekly. |
-| **Cold start / empty marketplace** — new user opens feed, sees nobody | High | **Seed the DB with generated fake profiles (§6.6)** so the feed is never empty: fakes backfill the feed only when real unseen candidates run out, never match, and phase out automatically as real density grows. Plus: growth plan (§13) seeds one community first; global feed by default early on; good "empty state" copy. |
+| **Cold start / empty marketplace** — new user opens feed, sees nobody | High | Use clear empty-state copy and seed one community first (§13); fake profiles are disabled. |
 | **Overengineering relapse** (v1's cause of death) | High | This PRD's non-goals (§4) are the contract. Rule: nothing gets abstracted until it hurts twice. |
 | Gender imbalance typical of dev spaces | None (accepted) | Non-issue by design: devs meet by code and stack, not gender. The product never promises romantic outcomes, and gender is never a filter or matching signal. |
 | Solo dev, no deadline → drift | Medium | Milestones (§12) are small and demo-able; each ends with a working bot. |
@@ -257,7 +248,7 @@ No `services/`, no `repositories/`, no DI container. Add structure only when pai
 - **M2 — Profiles:** full onboarding flow, snippet CRUD, profile preview/edit. *Done when: a user can register and see their own card.*
 - **M3 — Feed:** candidate selection, card rendering, like/skip, filters. *Done when: two test users can swipe on each other.*
 - **M4 — Matching:** mutual-like detection, reveal messages with photo + t.me link, notifications, `/matches`, missing-username flow. *Done when: two test users match and receive each other's contacts.*
-- **M5 — Launch polish:** `/delete`, events logging, copy polish in both languages, empty states, **seed DB with generated profiles (§6.6)**. *Done when: soft launch post goes out.*
+- **M5 — Launch polish:** `/delete`, events logging, copy polish in both languages, empty states. *Done when: soft launch post goes out.*
 
 ## 13. Growth Plan (first ~100–200 users)
 

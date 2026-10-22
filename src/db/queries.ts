@@ -186,11 +186,8 @@ export async function listSwipedIds(db: Db, fromUser: number): Promise<Set<numbe
 }
 
 export function pickCandidate(candidates: UserRecord[]): UserRecord | null {
-  const ranked = [...candidates];
-  ranked.sort((a, b) => {
-    if (a.isFake !== b.isFake) return a.isFake - b.isFake;
-    return b.lastActiveAt - a.lastActiveAt;
-  });
+  const ranked = candidates.filter((candidate) => candidate.isFake === 0);
+  ranked.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
 
   return ranked[0] ?? null;
 }
@@ -200,7 +197,7 @@ export async function listFeedCandidates(db: Db, viewer: UserRecord): Promise<Us
   const rows = await db
     .select()
     .from(users)
-    .where(and(eq(users.isActive, 1), isNull(users.state)))
+    .where(and(eq(users.isActive, 1), eq(users.isFake, 0), isNull(users.state)))
     .all();
 
   const open = rows.filter((row) => row.id !== viewer.id && !swiped.has(row.id));
@@ -279,7 +276,7 @@ export async function listMatchesForUser(
   for (const match of rows) {
     const meIsA = match.userA === userId;
     const other = await getUser(db, meIsA ? match.userB : match.userA);
-    if (other) result.push({ match, other, meIsA });
+    if (other && other.isFake === 0) result.push({ match, other, meIsA });
   }
   return result;
 }

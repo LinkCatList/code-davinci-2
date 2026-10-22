@@ -104,7 +104,7 @@ export async function processNewLike(
   toUserId: number,
 ): Promise<boolean> {
   const toUser = await getUser(ctx.db, toUserId);
-  if (!toUser) return false;
+  if (!toUser || fromUser.isFake === 1 || toUser.isFake === 1) return false;
 
   if (await hasReciprocalLike(ctx.db, fromUser.id, toUserId)) {
     const created = await insertMatch(ctx.db, fromUser.id, toUserId);
