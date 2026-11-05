@@ -9,3 +9,7 @@ binding = "DB"
 database_name = "code-davinci"
 database_id = "217ba6ea-462f-4e02-8544-87852355ffea"
 migrations_dir = "drizzle"
+
+[observability.logs]
+enabled = true
+invocation_logs = false
