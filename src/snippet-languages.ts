@@ -1,6 +1,7 @@
 export const SNIPPET_LANGUAGES = [
   "Rust",
   "Solidity",
+  "C",
   "C++",
   "Java",
   "Python",
@@ -23,6 +24,7 @@ export function isSnippetLanguage(value: string): value is SnippetLanguage {
 const FENCE_IDS: Record<SnippetLanguage, string> = {
   Rust: "rust",
   Solidity: "solidity",
+  C: "c",
   "C++": "cpp",
   Java: "java",
   Python: "python",
@@ -46,6 +48,7 @@ const ALIASES: Record<string, SnippetLanguage> = {
   rust: "Rust",
   solidity: "Solidity",
   sol: "Solidity",
+  c: "C",
   cpp: "C++",
   "c++": "C++",
   cxx: "C++",
