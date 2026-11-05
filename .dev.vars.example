@@ -1,4 +1,4 @@
 BOT_TOKEN=
 WEBHOOK_SECRET=
 # Only needed by the manual `pnpm webhook` override. `pnpm dev` uses the fixed localhost.run URL.
-WORKER_URL=https://64ce59a9c5d14b.lhr.life
+WORKER_URL=https://24c0bf3675b238.lhr.life

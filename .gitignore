@@ -5,3 +5,4 @@ dist
 *.sql.bak
 .playwright
 .playwright-mcp
+/.temp/seed.sql

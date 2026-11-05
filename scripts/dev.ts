@@ -11,7 +11,7 @@ import {
 } from "./telegram-webhook";
 
 const PNPM_COMMAND = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-const LOCALHOST_RUN_URL = "https://64ce59a9c5d14b.lhr.life";
+const LOCALHOST_RUN_URL = "https://24c0bf3675b238.lhr.life";
 const HEALTH_TIMEOUT_MS = 60_000;
 const HEALTH_REQUEST_TIMEOUT_MS = 5_000;
 const HEALTH_RETRY_DELAY_MS = 1_000;
