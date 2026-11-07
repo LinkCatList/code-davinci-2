@@ -3,7 +3,7 @@ import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { now } from "../now";
 import { localeFromTelegram, type Locale } from "../t";
 import * as schema from "./schema";
-import { events, likes, matches, priorityInvites, skips, snippets, users } from "./schema";
+import { events, likes, matches, skips, snippets, users } from "./schema";
 
 export type Db = DrizzleD1Database<typeof schema>;
 
@@ -229,27 +229,26 @@ export async function hasReciprocalLike(
 export async function insertMatch(db: Db, userX: number, userY: number): Promise<MatchRecord | null> {
   const userA = Math.min(userX, userY);
   const userB = Math.max(userX, userY);
-  const existing = await db
-    .select()
-    .from(matches)
-    .where(and(eq(matches.userA, userA), eq(matches.userB, userB)))
-    .get();
-  if (existing) return null;
-  try {
-    await db.insert(matches).values({
-      userA,
-      userB,
-      createdAt: now(),
-    });
-  } catch {
-    return null;
+  const existing = await db.select().from(matches).where(and(eq(matches.userA, userA), eq(matches.userB, userB))).get();
+  if (existing) {
+    // A later reciprocal like upgrades a one-sided Premium match to a regular mutual match.
+    if (existing.premiumOwnerId === null) return null;
+    await db.update(matches).set({ premiumOwnerId: null }).where(eq(matches.id, existing.id));
+    return (await db.select().from(matches).where(eq(matches.id, existing.id)).get()) ?? null;
   }
-  const created = await db
-    .select()
-    .from(matches)
-    .where(and(eq(matches.userA, userA), eq(matches.userB, userB)))
-    .get();
-  return created ?? null;
+  try {
+    await db.insert(matches).values({ userA, userB, createdAt: now(), premiumOwnerId: null });
+  } catch { return null; }
+  return (await db.select().from(matches).where(and(eq(matches.userA, userA), eq(matches.userB, userB))).get()) ?? null;
+}
+
+export async function insertPremiumMatch(db: Db, ownerId: number, otherId: number): Promise<MatchRecord | null> {
+  const userA = Math.min(ownerId, otherId);
+  const userB = Math.max(ownerId, otherId);
+  try {
+    await db.insert(matches).values({ userA, userB, premiumOwnerId: ownerId, createdAt: now() });
+  } catch { return null; }
+  return (await db.select().from(matches).where(and(eq(matches.userA, userA), eq(matches.userB, userB))).get()) ?? null;
 }
 
 export async function setMatchRevealed(
@@ -270,7 +269,7 @@ export async function listMatchesForUser(
   const rows = await db
     .select()
     .from(matches)
-    .where(or(eq(matches.userA, userId), eq(matches.userB, userId)))
+    .where(or(and(isNull(matches.premiumOwnerId), or(eq(matches.userA, userId), eq(matches.userB, userId))), eq(matches.premiumOwnerId, userId)))
     .all();
   const result: { match: MatchRecord; other: UserRecord; meIsA: boolean }[] = [];
   for (const match of rows) {
@@ -358,37 +357,6 @@ export function isProfileComplete(
     user.birthYear !== null &&
     user.gender !== null &&
     snippetCount > 0
-  );
-}
-
-
-export async function insertPriorityInvite(db: Db, fromUser: number, toUser: number): Promise<boolean> {
-  const existing = await db
-    .select({ id: priorityInvites.id })
-    .from(priorityInvites)
-    .where(and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)))
-    .get();
-  if (existing) return false;
-  await db.insert(priorityInvites).values({ fromUser, toUser, createdAt: now() });
-  return true;
-}
-
-export async function getPriorityInvite(
-  db: Db,
-  fromUser: number,
-  toUser: number,
-): Promise<boolean> {
-  const row = await db
-    .select({ id: priorityInvites.id })
-    .from(priorityInvites)
-    .where(and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)))
-    .get();
-  return row !== undefined;
-}
-
-export async function deletePriorityInvite(db: Db, fromUser: number, toUser: number): Promise<void> {
-  await db.delete(priorityInvites).where(
-    and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)),
   );
 }
 
