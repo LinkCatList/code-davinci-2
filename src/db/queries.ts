@@ -391,3 +391,13 @@ export async function deletePriorityInvite(db: Db, fromUser: number, toUser: num
     and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)),
   );
 }
+
+
+export async function hasSkipped(db: Db, fromUser: number, toUser: number): Promise<boolean> {
+  const row = await db
+    .select({ id: skips.id })
+    .from(skips)
+    .where(and(eq(skips.fromUser, fromUser), eq(skips.toUser, toUser)))
+    .get();
+  return row !== undefined;
+}
