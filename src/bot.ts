@@ -204,7 +204,7 @@ export function createBot(
   bot.command("likes", replyNextIncomingLike);
   bot.command("matches", handleMatchesCommand);
   bot.command("priority", handlePriorityCommand);
-  bot.callbackQuery(/^pi:(accept|decline):\\d+$/, handlePriorityCallback);
+  bot.callbackQuery(/^pi:(accept|decline):\d+$/, handlePriorityCallback);
   bot.callbackQuery(/^fd:(like|skip):\d+$/, handleFeedCallback);
   bot.callbackQuery(/^lk:open$/, handleLikesOpen);
   bot.callbackQuery(/^lk:(like|skip):\d+$/, handleLikesAction);
