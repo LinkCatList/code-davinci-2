@@ -43,16 +43,6 @@ export const likes = sqliteTable(
   (table) => [uniqueIndex("likes_from_to_unique").on(table.fromUser, table.toUser)],
 );
 
-export const priorityInvites = sqliteTable(
-  "priority_invites",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    fromUser: integer("from_user").notNull(),
-    toUser: integer("to_user").notNull(),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [uniqueIndex("priority_invites_pair_unique").on(table.fromUser, table.toUser)],
-);
 
 export const skips = sqliteTable(
   "skips",
@@ -73,6 +63,7 @@ export const matches = sqliteTable(
     userB: integer("user_b").notNull(),
     revealedA: integer("revealed_a").notNull().default(0),
     revealedB: integer("revealed_b").notNull().default(0),
+    premiumOwnerId: integer("premium_owner_id"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [uniqueIndex("matches_pair_unique").on(table.userA, table.userB)],
