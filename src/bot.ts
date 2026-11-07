@@ -23,6 +23,7 @@ import {
   replyNextIncomingLike,
 } from "./flows/feed";
 import { flushPendingReveals, handleMatchesCommand } from "./flows/match";
+import { handlePriorityCallback, handlePriorityCommand } from "./flows/priority";
 import { onboarding, type OutsideContext } from "./flows/onboarding";
 import { editProfile, handleProfileCallback, handleProfileCommand, startProfileEdit } from "./flows/profile";
 import { isPausedUser, parseBrowseMode, replyPaused, replyProfileScreen } from "./flows/screens";
@@ -202,6 +203,8 @@ export function createBot(
   bot.command("feed", handleFeedCommand);
   bot.command("likes", replyNextIncomingLike);
   bot.command("matches", handleMatchesCommand);
+  bot.command("priority", handlePriorityCommand);
+  bot.callbackQuery(/^pi:(accept|decline):\\d+$/, handlePriorityCallback);
   bot.callbackQuery(/^fd:(like|skip):\d+$/, handleFeedCallback);
   bot.callbackQuery(/^lk:open$/, handleLikesOpen);
   bot.callbackQuery(/^lk:(like|skip):\d+$/, handleLikesAction);
