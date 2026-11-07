@@ -3,7 +3,7 @@ import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { now } from "../now";
 import { localeFromTelegram, type Locale } from "../t";
 import * as schema from "./schema";
-import { events, likes, matches, skips, snippets, users } from "./schema";
+import { events, likes, matches, priorityInvites, skips, snippets, users } from "./schema";
 
 export type Db = DrizzleD1Database<typeof schema>;
 
@@ -358,5 +358,36 @@ export function isProfileComplete(
     user.birthYear !== null &&
     user.gender !== null &&
     snippetCount > 0
+  );
+}
+
+
+export async function insertPriorityInvite(db: Db, fromUser: number, toUser: number): Promise<boolean> {
+  const existing = await db
+    .select({ id: priorityInvites.id })
+    .from(priorityInvites)
+    .where(and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)))
+    .get();
+  if (existing) return false;
+  await db.insert(priorityInvites).values({ fromUser, toUser, createdAt: now() });
+  return true;
+}
+
+export async function getPriorityInvite(
+  db: Db,
+  fromUser: number,
+  toUser: number,
+): Promise<boolean> {
+  const row = await db
+    .select({ id: priorityInvites.id })
+    .from(priorityInvites)
+    .where(and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)))
+    .get();
+  return row !== undefined;
+}
+
+export async function deletePriorityInvite(db: Db, fromUser: number, toUser: number): Promise<void> {
+  await db.delete(priorityInvites).where(
+    and(eq(priorityInvites.fromUser, fromUser), eq(priorityInvites.toUser, toUser)),
   );
 }
