@@ -12,6 +12,7 @@ export const users = sqliteTable("users", {
   langFilter: text("lang_filter"),
   isActive: integer("is_active").notNull().default(1),
   isFake: integer("is_fake").notNull().default(0),
+  isPremium: integer("is_premium").notNull().default(0),
   lastActiveAt: integer("last_active_at").notNull(),
   lastLikeNotifAt: integer("last_like_notif_at"),
   lastCardUserId: integer("last_card_user_id"),
@@ -40,6 +41,17 @@ export const likes = sqliteTable(
     createdAt: integer("created_at").notNull(),
   },
   (table) => [uniqueIndex("likes_from_to_unique").on(table.fromUser, table.toUser)],
+);
+
+export const priorityInvites = sqliteTable(
+  "priority_invites",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    fromUser: integer("from_user").notNull(),
+    toUser: integer("to_user").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("priority_invites_pair_unique").on(table.fromUser, table.toUser)],
 );
 
 export const skips = sqliteTable(
