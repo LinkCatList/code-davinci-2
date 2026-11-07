@@ -2,14 +2,13 @@ import { InlineKeyboard } from "grammy";
 import {
   deletePriorityInvite,
   getPriorityInvite,
+  hasSkipped,
   getUser,
   insertEvent,
   insertLike,
   insertPriorityInvite,
   isOnboarding,
   listSnippets,
-  setBrowseState,
-  type UserRecord,
 } from "../db/queries";
 import { renderOwnCard } from "./card";
 import { processNewLike } from "./match";
@@ -33,7 +32,9 @@ export async function handlePriorityCommand(ctx: OutsideContext): Promise<void> 
     return;
   }
   const target = await getUser(ctx.db, targetId);
-  if (!target || target.isActive !== 1 || target.isFake === 1 || isOnboarding(target)) {
+  if (!target || target.isActive !== 1 || target.isFake === 1 || isOnboarding(target) ||
+      (await hasSkipped(ctx.db, target.id, sender.id)) ||
+      (await hasSkipped(ctx.db, sender.id, target.id))) {
     await ctx.reply(t(ctx.locale, "priorityUnavailable"));
     return;
   }
@@ -89,7 +90,9 @@ export async function handlePriorityCallback(ctx: OutsideContext): Promise<void>
     return;
   }
   const inviter = await getUser(ctx.db, inviterId);
-  if (!inviter || inviter.isFake === 1 || viewer.isFake === 1) {
+  if (!inviter || inviter.isFake === 1 || viewer.isFake === 1 ||
+      (await hasSkipped(ctx.db, viewer.id, inviter.id)) ||
+      (await hasSkipped(ctx.db, inviter.id, viewer.id))) {
     await ctx.reply(t(ctx.locale, "priorityInviteExpired"));
     return;
   }
