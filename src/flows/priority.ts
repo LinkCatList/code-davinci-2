@@ -73,7 +73,7 @@ export async function handlePriorityCommand(ctx: OutsideContext): Promise<void> 
 
 export async function handlePriorityCallback(ctx: OutsideContext): Promise<void> {
   const data = ctx.callbackQuery?.data ?? "";
-  const match = /^pi:(accept|decline):(\\d+)$/.exec(data);
+  const match = /^pi:(accept|decline):(\d+)$/.exec(data);
   if (!match || !ctx.from) return;
   try { await ctx.answerCallbackQuery(); } catch { /* already answered */ }
   const viewer = await getUser(ctx.db, ctx.from.id);
