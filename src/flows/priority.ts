@@ -90,7 +90,7 @@ export async function handlePriorityCallback(ctx: OutsideContext): Promise<void>
     return;
   }
   const inviter = await getUser(ctx.db, inviterId);
-  if (!inviter || inviter.isFake === 1 || viewer.isFake === 1 ||
+  if (!inviter || inviter.isActive !== 1 || inviter.isFake === 1 || viewer.isFake === 1 ||
       (await hasSkipped(ctx.db, viewer.id, inviter.id)) ||
       (await hasSkipped(ctx.db, inviter.id, viewer.id))) {
     await ctx.reply(t(ctx.locale, "priorityInviteExpired"));
