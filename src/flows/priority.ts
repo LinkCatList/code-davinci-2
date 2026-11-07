@@ -78,7 +78,7 @@ export async function handlePriorityCallback(ctx: OutsideContext): Promise<void>
   try { await ctx.answerCallbackQuery(); } catch { /* already answered */ }
   const viewer = await getUser(ctx.db, ctx.from.id);
   const inviterId = Number(match[2]);
-  if (!viewer || isOnboarding(viewer) || !(await getPriorityInvite(ctx.db, inviterId, viewer.id))) {
+  if (!viewer || viewer.isActive !== 1 || isOnboarding(viewer) || !(await getPriorityInvite(ctx.db, inviterId, viewer.id))) {
     await ctx.reply(t(ctx.locale, "priorityInviteExpired"));
     return;
   }
